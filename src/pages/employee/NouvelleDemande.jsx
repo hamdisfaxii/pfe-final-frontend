@@ -3,7 +3,16 @@ import { useNavigate } from "react-router-dom";
 import useDemandes from "../../hooks/useDemandes";
 import { calculerJoursOuvres } from "../../utils/calculJours";
 import { useAuth } from "../../context/authcontext";
-import { getSuperAdmins } from "../../utils/rhApi";
+import { getActiveWorkSchedule, getSuperAdmins, uploadDemandeAttachment } from "../../utils/rhApi";
+import AIScoreCard from "../../components/AIScoreCard";
+import {
+  collectScheduleSessionLabels,
+  getScheduleRowForDate,
+  isHalfDayAllowedOnRow,
+  normalizeScheduleCountry,
+  scheduleRowHasAnySession,
+} from "../../utils/workSchedule";
+import { normalizeCountryIsoForHr } from "../../utils/country";
 
 export default function NouvelleDemande() {
   const navigate = useNavigate();
@@ -28,6 +37,10 @@ export default function NouvelleDemande() {
   const [admins, setAdmins] = useState([]);
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [pieceJointe, setPieceJointe] = useState(null);
+  const [activeSchedule, setActiveSchedule] = useState(null);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleError, setScheduleError] = useState("");
 
   useEffect(() => {
     fetchSolde().catch(() => {});
@@ -39,30 +52,61 @@ export default function NouvelleDemande() {
       .catch(() => setAdmins([]));
   }, []);
 
+  useEffect(() => {
+    if (!user?.country) return;
+    const loadSchedule = async () => {
+      setScheduleLoading(true);
+      setScheduleError("");
+      try {
+        const schedule = await getActiveWorkSchedule(
+          normalizeScheduleCountry(user.country),
+        );
+        setActiveSchedule(schedule);
+      } catch {
+        setActiveSchedule(null);
+        setScheduleError("Impossible de charger le planning RH actif.");
+      } finally {
+        setScheduleLoading(false);
+      }
+    };
+    loadSchedule();
+  }, [user?.country]);
+
   const nbJours = useMemo(() => {
     if (!dateDebut || !dateFin) return 0;
     const start = new Date(dateDebut);
     const end = new Date(dateFin);
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
-    if (end <= start) return 0;
+    if (end < start) return 0;
     return calculerJoursOuvres(dateDebut, dateFin, user?.country || "");
   }, [dateDebut, dateFin, user?.country]);
 
+  const normalizeHalfDay = (value) => {
+    const v = String(value || "")
+      .trim()
+      .toUpperCase();
+    return v === "MORNING" || v === "AFTERNOON" ? v : "";
+  };
+
   const nbJoursExact = useMemo(() => {
     if (!dateDebut || !dateFin) return 0;
-    const base = nbJours;
-    if (base <= 0) return 0;
+    const start = new Date(dateDebut);
+    const end = new Date(dateFin);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
+    if (end < start) return 0;
     const sameDay = String(dateDebut) === String(dateFin);
+    const startPeriod = normalizeHalfDay(startHalfDay);
+    const endPeriod = normalizeHalfDay(endHalfDay);
     if (sameDay) {
-      const s = startHalfDay || "MORNING";
-      const e = endHalfDay || "AFTERNOON";
-      if (s === "AFTERNOON" && e === "MORNING") return 0;
-      if (s === e) return 0.5;
-      return 1;
+      if (nbJours === 0) return 0; // weekend ou jour férié
+      const actualStart = startPeriod || "MORNING";
+      const actualEnd = endPeriod || "AFTERNOON";
+      if (actualStart === "AFTERNOON" && actualEnd === "MORNING") return 0;
+      return actualStart === actualEnd ? 0.5 : 1;
     }
-    let exact = base;
-    if (startHalfDay) exact -= 0.5;
-    if (endHalfDay) exact -= 0.5;
+    let exact = nbJours;
+    if (startPeriod === "AFTERNOON") exact -= 0.5;
+    if (endPeriod === "MORNING") exact -= 0.5;
     return Math.max(0, exact);
   }, [dateDebut, dateFin, endHalfDay, nbJours, startHalfDay]);
 
@@ -77,14 +121,54 @@ export default function NouvelleDemande() {
 
     const start = new Date(dateDebut);
     const end = new Date(dateFin);
-    if (end <= start) {
-      setFormError("La date de fin doit être supérieure à la date de début.");
+    if (end < start) {
+      setFormError("La date de fin ne peut pas être antérieure à la date de début.");
       return;
     }
 
     if (nbJoursExact <= 0) {
       setFormError("Le nombre de jours doit être supérieur à 0.");
       return;
+    }
+
+    if (activeSchedule && dateDebut) {
+      const startRow = getScheduleRowForDate(activeSchedule.rows, dateDebut);
+      const endRow =
+        dateFin !== dateDebut
+          ? getScheduleRowForDate(activeSchedule.rows, dateFin)
+          : startRow;
+
+      if (
+        (startHalfDay || endHalfDay) &&
+        (!startRow || !scheduleRowHasAnySession(startRow))
+      ) {
+        setFormError(
+          "Le planning RH actif ne définit pas de plage horaire pour la date de début de congé.",
+        );
+        return;
+      }
+      if (
+        endHalfDay &&
+        dateFin !== dateDebut &&
+        (!endRow || !scheduleRowHasAnySession(endRow))
+      ) {
+        setFormError(
+          "Le planning RH actif ne définit pas de plage horaire pour la date de fin de congé.",
+        );
+        return;
+      }
+      if (startHalfDay && !isHalfDayAllowedOnRow(startRow, startHalfDay)) {
+        setFormError(
+          `La période de début (${startHalfDay.toLowerCase()}) n'est pas disponible dans le planning RH actif : ${collectScheduleSessionLabels(startRow)}`,
+        );
+        return;
+      }
+      if (endHalfDay && !isHalfDayAllowedOnRow(endRow, endHalfDay)) {
+        setFormError(
+          `La période de fin (${endHalfDay.toLowerCase()}) n'est pas disponible dans le planning RH actif : ${collectScheduleSessionLabels(endRow)}`,
+        );
+        return;
+      }
     }
 
     if (!titre) {
@@ -120,10 +204,11 @@ export default function NouvelleDemande() {
         "Le congé maladie doit être déclaré dans les 48h suivant le début du congé.",
       );
       return;
-    } //  la congé maladie doit être déclaré dans les 48h suivant le début du congé (travaille avec melie seconde pour faire le calcul )
+    }
+
     try {
       setSubmitting(true);
-      await creerDemande({
+      const demande = await creerDemande({
         dateDebut,
         dateFin,
         titre,
@@ -134,6 +219,12 @@ export default function NouvelleDemande() {
         startHalfDay: startHalfDay || undefined,
         endHalfDay: endHalfDay || undefined,
       });
+      if (titre === "Congé maladie" && pieceJointe) {
+        const demandeId = demande?.id ?? demande?.ID;
+        if (demandeId) {
+          await uploadDemandeAttachment(demandeId, pieceJointe);
+        }
+      }
       navigate("/employee/historique");
     } catch (err) {
       const apiMsg =
@@ -166,6 +257,20 @@ export default function NouvelleDemande() {
         <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
           Nouvelle demande de congé
         </h1>
+
+        {scheduleError ? (
+          <div className="mt-4 rounded-xl border-l-4 border-red-500 bg-red-50 p-3 text-sm text-red-700">
+            {scheduleError}
+          </div>
+        ) : scheduleLoading ? (
+          <div className="mt-4 rounded-xl border-l-4 border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+            Chargement du planning RH actif...
+          </div>
+        ) : activeSchedule ? (
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+            Planning RH actif : {activeSchedule.activeType || "NORMAL"}
+          </div>
+        ) : null}
 
         <div className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-md ring-1 ring-slate-900/5 fade-in-up">
           <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
@@ -227,7 +332,9 @@ export default function NouvelleDemande() {
               >
                 <option value="Congé payé">Congé payé</option>
                 <option value="Congé sans solde">Sans solde</option>
-                <option value="Congé maladie">Maladie</option>
+                {normalizeCountryIsoForHr(user?.country ?? user?.pays) === "TN" && (
+                  <option value="Congé maladie">Maladie</option>
+                )}
               </select>
             </div>
 
@@ -300,11 +407,11 @@ export default function NouvelleDemande() {
                 <option value="">
                   {admins.length > 0
                     ? "Sélectionner un validateur"
-                    : "Validateurs indisponibles (mode compat)"}
+                    : "Aucun validateur disponible"}
                 </option>
                 {admins.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name || a.email}
+                  <option key={a.id ?? a.email ?? a.name} value={a.id}>
+                    {a.name || a.email || "Super Admin"}
                   </option>
                 ))}
               </select>
@@ -318,6 +425,29 @@ export default function NouvelleDemande() {
                 className={`${fld} min-h-[96px] resize-y`}
               />
             </div>
+
+            {titre === "Congé maladie" && (
+              <div>
+                <label className={lbl}>
+                  Justificatif médical{" "}
+                  <span className="text-slate-400 font-normal">(optionnel)</span>
+                </label>
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.heic"
+                  onChange={(e) => setPieceJointe(e.target.files?.[0] ?? null)}
+                  className="w-full text-sm text-slate-700 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                />
+                {pieceJointe && (
+                  <p className="mt-1 text-xs text-emerald-700 font-medium">
+                    Fichier sélectionné : {pieceJointe.name}
+                  </p>
+                )}
+                <p className="mt-1 text-xs text-slate-500">
+                  Formats acceptés : PDF, JPG, PNG, HEIC — 10 Mo max.
+                </p>
+              </div>
+            )}
           </div>
 
           {formError && (
@@ -329,6 +459,26 @@ export default function NouvelleDemande() {
                 </div>
               </div>
             </div>
+          )}
+
+          {dateDebut && dateFin && (
+            <AIScoreCard
+              demandeData={{
+                titre,
+                dateDebut,
+                dateFin,
+                startHalfDay,
+                endHalfDay,
+                commentaire,
+                typeConge: titre.toLowerCase().includes("maladie")
+                  ? "CONGE_MALADIE"
+                  : titre.toLowerCase().includes("sans solde")
+                    ? "CONGE_SANS_SOLDE"
+                    : "CONGES_PAYES",
+              }}
+              userId={user?.id}
+              isLoading={loading}
+            />
           )}
 
           <div className="mt-5 flex gap-2 justify-end">

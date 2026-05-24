@@ -1,10 +1,20 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import useDemandes from "../../hooks/useDemandes";
-import { getSuperAdmins } from "../../utils/rhApi";
+import { getActiveWorkSchedule, getSuperAdmins } from "../../utils/rhApi";
+import AIScoreCard from "../../components/AIScoreCard";
+import { useAuth } from "../../context/authcontext";
+import {
+  collectScheduleSessionLabels,
+  getScheduleRowForDate,
+  isTimeWithinAnyScheduleSession,
+  normalizeScheduleCountry,
+  scheduleRowHasAnySession,
+} from "../../utils/workSchedule";
 
 export default function NouvelleDemandeRetard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { loading, error, creerDemande } = useDemandes();
 
   const [date, setDate] = useState("");
@@ -14,6 +24,9 @@ export default function NouvelleDemandeRetard() {
   const [admins, setAdmins] = useState([]);
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [activeSchedule, setActiveSchedule] = useState(null);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleError, setScheduleError] = useState("");
 
   useEffect(() => {
     getSuperAdmins()
@@ -21,11 +34,30 @@ export default function NouvelleDemandeRetard() {
       .catch(() => setAdmins([]));
   }, []);
 
+  useEffect(() => {
+    if (!user?.country) return;
+    const loadSchedule = async () => {
+      setScheduleLoading(true);
+      setScheduleError("");
+      try {
+        const schedule = await getActiveWorkSchedule(
+          normalizeScheduleCountry(user.country),
+        );
+        setActiveSchedule(schedule);
+      } catch {
+        setActiveSchedule(null);
+        setScheduleError("Impossible de charger le planning RH actif.");
+      } finally {
+        setScheduleLoading(false);
+      }
+    };
+    loadSchedule();
+  }, [user?.country]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError("");
 
-    // Validation des champs obligatoires
     if (!date) {
       setFormError("Veuillez renseigner la date.");
       return;
@@ -36,18 +68,32 @@ export default function NouvelleDemandeRetard() {
       return;
     }
 
-    // Validation du format de la date
     const dateObj = new Date(date);
     if (Number.isNaN(dateObj.getTime())) {
       setFormError("La date n'est pas valide.");
       return;
     }
 
-    // Validation du format de l'heure (HH:MM)
     const heureRegex = /^\d{2}:\d{2}$/;
     if (!heureRegex.test(heureArrivee)) {
       setFormError("L'heure doit être au format HH:MM.");
       return;
+    }
+
+    if (activeSchedule && date) {
+      const scheduleRow = getScheduleRowForDate(activeSchedule.rows, date);
+      if (!scheduleRow || !scheduleRowHasAnySession(scheduleRow)) {
+        setFormError(
+          "Le planning RH actif ne définit pas de plage horaire pour cette date.",
+        );
+        return;
+      }
+      if (!isTimeWithinAnyScheduleSession(scheduleRow, heureArrivee)) {
+        setFormError(
+          `L'heure d'arrivée doit se situer dans le planning RH actif : ${collectScheduleSessionLabels(scheduleRow)}`,
+        );
+        return;
+      }
     }
 
     if (admins.length > 0 && !approvedByAdminId) {
@@ -95,6 +141,22 @@ export default function NouvelleDemandeRetard() {
           Soumettez votre demande de retard selon vos horaires.
         </p>
 
+        {scheduleError && (
+          <div className="mt-4 rounded-xl border-l-4 border-red-500 bg-red-50 p-4 text-sm text-red-700">
+            {scheduleError}
+          </div>
+        )}
+        {!scheduleError && scheduleLoading && (
+          <div className="mt-4 rounded-xl border-l-4 border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            Chargement du planning RH actif...
+          </div>
+        )}
+        {!scheduleError && !scheduleLoading && activeSchedule && (
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            Planning RH actif : {activeSchedule.activeType || "NORMAL"}
+          </div>
+        )}
+
         {(loading || submitting) && (
           <div className="mt-4 text-sm font-medium text-slate-600">
             Chargement...
@@ -127,11 +189,11 @@ export default function NouvelleDemandeRetard() {
                 <option value="">
                   {admins.length > 0
                     ? "Sélectionner un Super Admin"
-                    : "Super Admins indisponibles (mode compat)"}
+                    : "Aucun validateur disponible"}
                 </option>
                 {admins.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name || a.email}
+                  <option key={a.id ?? a.email ?? a.name} value={a.id}>
+                    {a.name || a.email || "Super Admin"}
                   </option>
                 ))}
               </select>
@@ -141,10 +203,11 @@ export default function NouvelleDemandeRetard() {
             </div>
 
             <div>
-              <label className="text-sm font-semibold text-slate-700 block mb-2">
+              <label htmlFor="retard-date" className="text-sm font-semibold text-slate-700 block mb-2">
                 Date <span className="text-red-500">*</span>
               </label>
               <input
+                id="retard-date"
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
@@ -154,10 +217,11 @@ export default function NouvelleDemandeRetard() {
             </div>
 
             <div>
-              <label className="text-sm font-semibold text-slate-700 block mb-2">
+              <label htmlFor="retard-heure" className="text-sm font-semibold text-slate-700 block mb-2">
                 Heure d'arrivée prévue <span className="text-red-500">*</span>
               </label>
               <input
+                id="retard-heure"
                 type="time"
                 value={heureArrivee}
                 onChange={(e) => setHeureArrivee(e.target.value)}
@@ -167,10 +231,11 @@ export default function NouvelleDemandeRetard() {
             </div>
 
             <div className="sm:col-span-2">
-              <label className="text-sm font-semibold text-slate-700 block mb-2">
+              <label htmlFor="retard-motif" className="text-sm font-semibold text-slate-700 block mb-2">
                 Motif (optionnel)
               </label>
               <textarea
+                id="retard-motif"
                 value={motif}
                 onChange={(e) => setMotif(e.target.value)}
                 className="w-full min-h-[120px] resize-y border border-slate-200 rounded-lg px-4 py-2.5 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -188,6 +253,20 @@ export default function NouvelleDemandeRetard() {
                 </div>
               </div>
             </div>
+          )}
+
+          {date && (
+            <AIScoreCard
+              demandeData={{
+                titre: "Retard",
+                dateDebut: date,
+                dateFin: date,
+                commentaire: motif,
+                typeConge: "RETARD_DEMAND",
+              }}
+              userId={user?.id}
+              isLoading={loading}
+            />
           )}
 
           <div className="mt-8 flex gap-4 justify-end">

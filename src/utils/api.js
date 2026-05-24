@@ -2,8 +2,8 @@ import axios from "axios";
 
 // Je crée un livreur personnalisé (une instance axios)
 const api = axios.create({
-  // Dev local (Vite) : http://localhost:8080/api — Docker (Nginx) : /api (proxy vers backend)
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api",
+  // Toujours relatif : Vite proxy → localhost:8080 en dev, Nginx → backend en prod
+  baseURL: import.meta.env.VITE_API_BASE_URL ?? "/api",
   timeout: 10000, // évite des timeouts silencieux trop courts
   headers: { "Content-Type": "application/json" }, // j'envoie du JSON
 });

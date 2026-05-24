@@ -6,23 +6,13 @@ import ModalConfirmation from "../../components/commun/ModalConfirmation";
 import Spinner from "../../components/commun/Spinner";
 import { formaterDate } from "../../utils/calculJours";
 import { libelleAffichageTypeConge } from "../../utils/country";
+import { useAuth } from "../../context/authcontext";
 
-/**
- * Formate les nombres décimaux avec virgule française (ex: 7,5 pour 7.5)
- * Affiche les entiers sans décimales (ex: 7 au lieu de 7,00)
- */
 const formatDecimalFr = (val) => {
   if (val == null || !Number.isFinite(Number(val))) return "—";
   const n = Number(val);
-  // Si c'est un entier, afficher sans décimales
-  if (Math.abs(n - Math.round(n)) < 1e-6) {
-    return String(Math.round(n));
-  }
-  // Pour les décimales, afficher avec virgule française
-  return n.toLocaleString("fr-FR", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 2,
-  });
+  if (Math.abs(n - Math.round(n)) < 1e-6) return String(Math.round(n));
+  return n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
 };
 
 const normalizeForStatus = (statut) => {
@@ -44,6 +34,7 @@ const pickId = (demande) => demande?.id ?? demande?._id ?? demande?.ID;
 export default function DetailDemande() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { user } = useAuth();
   const { demandeDetail, loading, error, fetchDemandeById, annulerDemande } =
     useDemandes();
 
@@ -116,6 +107,7 @@ export default function DetailDemande() {
                         demandeDetail?.titre ??
                           demandeDetail?.typeConge ??
                           demandeDetail?.type,
+                        user?.country ?? user?.pays,
                       )}
                     </div>
                   </div>
@@ -135,9 +127,13 @@ export default function DetailDemande() {
                           demandeDetail?.approuvePar ??
                           demandeDetail?.approvedBy ??
                           null;
+                        if (!ap) return "--";
+                        if (typeof ap === "string") return ap;
                         const nm =
-                          `${ap?.prenom ?? ""} ${ap?.nom ?? ""}`.trim();
-                        return nm || ap?.email || "--";
+                          `${ap?.prenom ?? ap?.firstName ?? ""} ${ap?.nom ?? ap?.lastName ?? ""}`.trim();
+                        return (
+                          nm || ap?.name || ap?.fullName || ap?.email || "--"
+                        );
                       })()}
                     </div>
                   </div>

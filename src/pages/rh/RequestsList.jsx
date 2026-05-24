@@ -6,22 +6,18 @@ import Spinner from "../../components/commun/Spinner";
 import StatutBadge from "../../components/employee/StatutBadge";
 import { libelleAffichageTypeConge } from "../../utils/country";
 
-/**
- * Formate les nombres décimaux avec virgule française (ex: 7,5 pour 7.5)
- * Affiche les entiers sans décimales (ex: 7 au lieu de 7,00)
- */
+const formatDateFr = (raw) => {
+  if (!raw) return "—";
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return String(raw);
+  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+};
+
 const formatDecimalFr = (val) => {
   if (val == null || !Number.isFinite(Number(val))) return "—";
   const n = Number(val);
-  // Si c'est un entier, afficher sans décimales
-  if (Math.abs(n - Math.round(n)) < 1e-6) {
-    return String(Math.round(n));
-  }
-  // Pour les décimales, afficher avec virgule française
-  return n.toLocaleString("fr-FR", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 2,
-  });
+  if (Math.abs(n - Math.round(n)) < 1e-6) return String(Math.round(n));
+  return n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
 };
 
 export default function RequestsList() {
@@ -190,10 +186,10 @@ export default function RequestsList() {
                         {r.employe?.prenom} {r.employe?.nom}
                       </td>
                       <td className="p-4 text-slate-700">
-                        {libelleAffichageTypeConge(r.typeConge)}
+                        {libelleAffichageTypeConge(r.typeConge, r.employe?.country)}
                       </td>
                       <td className="p-4 text-slate-700">
-                        {r.dateDebut} → {r.dateFin}
+                        {formatDateFr(r.dateDebut)} → {formatDateFr(r.dateFin)}
                       </td>
                       <td className="p-4 text-slate-700">
                         {(() => {

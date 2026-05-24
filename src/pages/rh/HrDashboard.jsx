@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getHrStats } from "../../utils/rhApi";
 import Spinner from "../../components/commun/Spinner";
+import AIValidationModule from "../../components/AIValidationModule";
 
 export default function HrDashboard() {
   const [loading, setLoading] = useState(false);
@@ -103,6 +104,8 @@ export default function HrDashboard() {
             </div>
           ))}
         </div>
+
+        <AIValidationModule />
 
         <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 fade-in-up">
           <Link

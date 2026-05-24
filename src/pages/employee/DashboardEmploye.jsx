@@ -3,31 +3,48 @@ import { useNavigate } from "react-router-dom";
 import useDemandes from "../../hooks/useDemandes";
 import SoldeConge from "../../components/employee/SoldeConge";
 import CarteAction from "../../components/employee/CarteAction";
+import StatutBadge from "../../components/employee/StatutBadge";
 import Spinner from "../../components/commun/Spinner";
 import { useAuth } from "../../context/authcontext";
-import { isFranceSortieCourteEligible, metaForCountry } from "../../utils/country";
+import { formaterDate } from "../../utils/calculJours";
+import {
+  isFranceSortieCourteEligible,
+  libelleAffichageTypeConge,
+  metaForCountry,
+} from "../../utils/country";
 
 export default function DashboardEmploye() {
   const { user } = useAuth();
-  const { solde, soldeSummary, loading, error, fetchSolde } = useDemandes();
+  const {
+    solde,
+    soldeSummary,
+    demandes,
+    loading,
+    error,
+    fetchSolde,
+    fetchDemandes,
+  } = useDemandes();
   const navigate = useNavigate();
   const paysMeta = metaForCountry(user?.country);
 
-  const reloadSoldes = useCallback(() => {
+  const reloadAll = useCallback(() => {
     fetchSolde().catch(() => {});
-  }, [fetchSolde]);
+    fetchDemandes({}).catch(() => {});
+  }, [fetchSolde, fetchDemandes]);
 
   useEffect(() => {
-    reloadSoldes();
-  }, [reloadSoldes]);
+    reloadAll();
+  }, [reloadAll]);
 
   useEffect(() => {
     const onVis = () => {
-      if (document.visibilityState === "visible") reloadSoldes();
+      if (document.visibilityState === "visible") reloadAll();
     };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
-  }, [reloadSoldes]);
+  }, [reloadAll]);
+
+  const recentDemandes = demandes.slice(0, 5);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -41,26 +58,30 @@ export default function DashboardEmploye() {
               <span className="text-lg" aria-hidden>
                 {paysMeta.flag}
               </span>
-              <span className="font-semibold text-slate-900">{paysMeta.label}</span>
+              <span className="font-semibold text-slate-900">
+                {paysMeta.label}
+              </span>
               <span className="text-xs text-slate-500 uppercase tracking-wide">
                 ({user.country || "—"})
               </span>
             </span>
             {user.departement ? (
               <span className="text-slate-500">
-                Service : <strong className="text-slate-800">{user.departement}</strong>
+                Service :{" "}
+                <strong className="text-slate-800">{user.departement}</strong>
               </span>
             ) : null}
           </div>
         )}
 
+        {/* Solde */}
         <div className="mt-8">
           <div className="mb-3 flex justify-end">
             <button
               type="button"
-              onClick={() => reloadSoldes()}
+              onClick={reloadAll}
               disabled={loading}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-all"
             >
               {loading ? "Chargement…" : "Actualiser"}
             </button>
@@ -84,6 +105,7 @@ export default function DashboardEmploye() {
           )}
         </div>
 
+        {/* Actions rapides */}
         <div className="mt-10 flex flex-wrap justify-center gap-6">
           <div className="w-full sm:w-80">
             <CarteAction
@@ -109,13 +131,13 @@ export default function DashboardEmploye() {
             <CarteAction
               titre={
                 isFranceSortieCourteEligible(user?.country)
-                  ? "Sortie courte durée (France — RTT)"
+                  ? "RTT (France)"
                   : "Autorisation courte (2 h)"
               }
               description={
                 isFranceSortieCourteEligible(user?.country)
                   ? "RTT en jours ouvrés ou plage horaire : uniquement sur cet écran, pas sur la demande de congé classique."
-                  : "Jusqu’à 2 autorisations de 2 h par mois (types : rendez-vous, urgence, autorisation)."
+                  : "Jusqu'à 2 autorisations de 2 h par mois (types : rendez-vous, urgence, autorisation)."
               }
               boutonTexte="Faire une demande"
               icone={<div className="text-2xl">⏰</div>}
@@ -131,51 +153,110 @@ export default function DashboardEmploye() {
               onClick={() => navigate("/employee/retard/new")}
             />
           </div>
-
         </div>
 
-        <div className="mt-10 overflow-x-auto rounded-2xl border border-slate-100 bg-white shadow-sm">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr className="text-left">
-                <th className="p-4 font-semibold text-slate-900">Suivi des demandes</th>
-                <th className="p-4 font-semibold text-slate-900">Description</th>
-                <th className="p-4 font-semibold text-slate-900">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-t border-slate-100 hover:bg-slate-50">
-                <td className="p-4 text-slate-800 font-medium">Demandes en cours</td>
-                <td className="p-4 text-slate-600">
-                  Consultez vos demandes en attente de validation.
-                </td>
-                <td className="p-4">
-                  <button
-                    type="button"
-                    onClick={() => navigate("/employee/historique?statut=attente")}
-                    className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition-all"
-                  >
-                    Ouvrir
-                  </button>
-                </td>
-              </tr>
-              <tr className="border-t border-slate-100 hover:bg-slate-50">
-                <td className="p-4 text-slate-800 font-medium">Historique des demandes</td>
-                <td className="p-4 text-slate-600">
-                  Voir toutes vos demandes (acceptées, refusées, annulées).
-                </td>
-                <td className="p-4">
-                  <button
-                    type="button"
-                    onClick={() => navigate("/employee/historique?statut=tous")}
-                    className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-900 transition-all"
-                  >
-                    Ouvrir
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        {/* Demandes récentes */}
+        <div className="mt-10">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-bold text-slate-900">
+              Demandes récentes
+            </h2>
+            <button
+              type="button"
+              onClick={() => navigate("/employee/historique?statut=tous")}
+              className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-all"
+            >
+              Voir tout →
+            </button>
+          </div>
+
+          <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white shadow-sm fade-in-up">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr className="text-left">
+                  <th className="p-4 font-semibold text-slate-900">Type</th>
+                  <th className="p-4 font-semibold text-slate-900">Début</th>
+                  <th className="p-4 font-semibold text-slate-900">Fin</th>
+                  <th className="p-4 font-semibold text-slate-900">Jours</th>
+                  <th className="p-4 font-semibold text-slate-900">État</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading && demandes.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="p-6 text-center text-slate-500">
+                      Chargement…
+                    </td>
+                  </tr>
+                ) : recentDemandes.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="p-6 text-center text-slate-500">
+                      Aucune demande pour le moment.
+                    </td>
+                  </tr>
+                ) : (
+                  recentDemandes.map((demande) => {
+                    const id =
+                      demande?.id ?? demande?._id ?? demande?.ID;
+                    const etat = demande?.statut ?? demande?.status;
+                    const jours =
+                      demande?.nbJours ??
+                      demande?.nombreJours ??
+                      demande?.jours ??
+                      demande?.nb_days;
+                    const titre = demande?.titre ?? demande?.type;
+
+                    return (
+                      <tr
+                        key={id}
+                        className="border-t border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors"
+                        onClick={() => navigate(`/employee/demande/${id}`)}
+                      >
+                        <td className="p-4 text-slate-700">
+                          {titre
+                            ? libelleAffichageTypeConge(titre, user?.country ?? user?.pays)
+                            : "—"}
+                        </td>
+                        <td className="p-4 text-slate-700">
+                          {formaterDate(
+                            demande?.dateDebut ?? demande?.debut,
+                          )}
+                        </td>
+                        <td className="p-4 text-slate-700">
+                          {formaterDate(demande?.dateFin ?? demande?.fin)}
+                        </td>
+                        <td className="p-4 text-slate-700">
+                          {typeof jours === "number" ? jours : "—"}
+                        </td>
+                        <td className="p-4">
+                          <StatutBadge statut={etat} />
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() =>
+                navigate("/employee/historique?statut=attente")
+              }
+              className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition-all"
+            >
+              Demandes en cours
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/employee/historique?statut=tous")}
+              className="rounded-lg bg-slate-800 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-900 transition-all"
+            >
+              Historique complet
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -44,7 +44,8 @@ export function calendarEventClassesForCountry(isoRaw) {
   }
   const code = normalizeCountryIsoForHr(isoRaw) || "TN";
   return (
-    COUNTRY_CALENDAR_EVENT_CLASSES[code] ?? "border-transparent bg-slate-500 text-white shadow-sm"
+    COUNTRY_CALENDAR_EVENT_CLASSES[code] ??
+    "border-transparent bg-slate-500 text-white shadow-sm"
   );
 }
 
@@ -60,20 +61,38 @@ export function mapOverseasFrToMetro(iso2) {
 
 /**
  * Pays canonique parmi TN | FR | MA ; inconnu après normalisation DOM → défaut TN.
+ * Synchronisé avec backend CountryPolicyService.normalizeBusinessCountry()
  */
 export function normalizeCountryIsoForHr(raw) {
-  const c = String(raw ?? "").trim().toUpperCase();
+  // Supprime les accents (ex. « Français » → « FRANCAIS ») avant la recherche par
+  // mots-clés, sinon le « ç » casse le includes("FRANC"). Synchronisé avec backend.
+  const c = String(raw ?? "")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .trim()
+    .toUpperCase();
   if (!c) return "";
+
+  // Outre-mer français → FR
   const metro = mapOverseasFrToMetro(c);
-  if (metro === "TN" || metro === "FR" || metro === "MA") return metro;
-  if (c.includes("TUNIS") || metro.includes("TUNIS")) return "TN";
-  if (c.includes("FRANCE") || metro.includes("FRANC")) return "FR";
-  if (
-    c.includes("MAROC") ||
-    c.includes("MOROCCO") ||
-    String(raw).toLowerCase().includes("maroc")
-  )
+
+  // Codes ISO2 valides uniquement
+  if (metro === "TN" || metro === "FR" || metro === "MA") {
+    return metro;
+  }
+
+  // Recherche par mots-clés (ordre : TN, FR, MA)
+  if (c.includes("TUNIS")) {
+    return "TN";
+  }
+  if (c.includes("FRANCE") || c.includes("FRANC")) {
+    return "FR";
+  }
+  if (c.includes("MAROC") || c.includes("MOROCCO")) {
     return "MA";
+  }
+
+  // Défaut : Tunisie
   return "TN";
 }
 
@@ -87,21 +106,28 @@ export function isFranceSortieCourteEligible(isoRaw) {
   return normalizeCountryIsoForHr(isoRaw) === "FR";
 }
 
-/** Libellé affiché pour un type de congé à partir du code ou du libellé API. */
-export function libelleAffichageTypeConge(raw) {
+/** Libellé affiché pour un type de congé à partir du code ou du libellé API.
+ *  @param {string} raw   - code TypeConge ou libellé brut
+ *  @param {string} [country] - pays de l'employé (optionnel). Si FR → COURTE_DUREE = "RTT".
+ *                              Sinon → "Sortie courte durée" (permission TN/MA). */
+export function libelleAffichageTypeConge(raw, country) {
   if (raw == null || raw === "") return "—";
   let s = String(raw).trim();
   if (!s) return "—";
 
-  s = s.replace(/\bRTT\b/gi, "sortie courte durée").replace(/\s{2,}/g, " ").trim();
+  s = s.replace(/\s{2,}/g, " ").trim();
 
   const key = s.toUpperCase().replace(/[\s-]+/g, "_");
+  const isFrance = normalizeCountryIsoForHr(country) === "FR";
+  const courteDureeLabel = isFrance ? "RTT" : "Sortie courte durée";
+
   const map = {
     PAYE: "Congé payé",
     CONGES_PAYES: "Congés payés",
     CONGE_PAYE: "Congé payé",
-    COURTE_DUREE: "Sortie courte durée",
-    SORTIE_COURTE: "Sortie courte durée",
+    RTT: "RTT",
+    COURTE_DUREE: courteDureeLabel,
+    SORTIE_COURTE: courteDureeLabel,
     MALADIE: "Congé maladie",
     CONGE_MALADIE: "Congé maladie",
     SANS_SOLDE: "Congé sans solde",
@@ -116,11 +142,14 @@ export function libelleAffichageTypeConge(raw) {
   if (map[key]) return map[key];
 
   if (key.includes("COURTE_DUREE") || key.includes("SHORT_LEAVE"))
-    return "Sortie courte durée";
+    return courteDureeLabel;
 
   if (/[a-zàâäéèêëïîôùûç]/i.test(s) && !/^[A-Z0-9_]+$/.test(s)) return s;
 
   const human = key.replace(/_/g, " ").toLowerCase();
   if (!human) return "—";
-  return human.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.slice(1));
+  return human.replace(
+    /\w\S*/g,
+    (txt) => txt.charAt(0).toUpperCase() + txt.slice(1),
+  );
 }

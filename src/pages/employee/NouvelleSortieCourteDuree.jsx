@@ -3,10 +3,19 @@ import { Navigate, useNavigate } from "react-router-dom";
 import useDemandes from "../../hooks/useDemandes";
 import { useAuth } from "../../context/authcontext";
 import { isFranceSortieCourteEligible } from "../../utils/country";
-import { getSuperAdmins } from "../../utils/rhApi";
+import { getActiveWorkSchedule, getSuperAdmins } from "../../utils/rhApi";
+import AIScoreCard from "../../components/AIScoreCard";
+import { normalizeScheduleCountry } from "../../utils/workSchedule";
 
 const NON_FR_CAP = 2;
 const FIXED_MINUTES = 120;
+
+function formatRttJours(val) {
+  if (val == null || !Number.isFinite(Number(val))) return "—";
+  const n = Number(val);
+  if (Math.abs(n - Math.round(n)) < 1e-6) return String(Math.round(n));
+  return n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+}
 
 function pad2(n) {
   return String(n).padStart(2, "0");
@@ -23,10 +32,10 @@ function addMinutesToTimeString(hhmm, deltaMin) {
 }
 
 function minutesDelta(hd, hf) {
-  if (!hd || !hf) return NaN;
+  if (!hd || !hf) return Number.NaN;
   const [h1, m1] = hd.split(":").map(Number);
   const [h2, m2] = hf.split(":").map(Number);
-  if (![h1, m1, h2, m2].every(Number.isFinite)) return NaN;
+  if (![h1, m1, h2, m2].every(Number.isFinite)) return Number.NaN;
   return h2 * 60 + m2 - (h1 * 60 + m1);
 }
 
@@ -37,7 +46,6 @@ export default function NouvelleSortieCourteDuree() {
     useDemandes();
 
   const fr = isFranceSortieCourteEligible(user?.country);
-  const [frMode, setFrMode] = useState("RTT"); // "RTT" | "2H"
 
   const [dateDebut, setDateDebut] = useState("");
   const [dateFin, setDateFin] = useState("");
@@ -49,6 +57,9 @@ export default function NouvelleSortieCourteDuree() {
   const [admins, setAdmins] = useState([]);
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [activeSchedule, setActiveSchedule] = useState(null);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleError, setScheduleError] = useState("");
 
   const restantes =
     typeof soldeSummary?.autorisationsCourtesMoisRestantes === "number"
@@ -80,10 +91,30 @@ export default function NouvelleSortieCourteDuree() {
   }, []);
 
   useEffect(() => {
-    if ((!fr || frMode === "2H") && heureDebut) {
+    if (!user?.country) return;
+    const loadSchedule = async () => {
+      setScheduleLoading(true);
+      setScheduleError("");
+      try {
+        const schedule = await getActiveWorkSchedule(
+          normalizeScheduleCountry(user.country),
+        );
+        setActiveSchedule(schedule);
+      } catch {
+        setActiveSchedule(null);
+        setScheduleError("Impossible de charger le planning RH actif.");
+      } finally {
+        setScheduleLoading(false);
+      }
+    };
+    loadSchedule();
+  }, [user?.country]);
+
+  useEffect(() => {
+    if (!fr && heureDebut) {
       setHeureFin(addMinutesToTimeString(heureDebut, FIXED_MINUTES));
     }
-  }, [fr, frMode, heureDebut]);
+  }, [fr, heureDebut]);
 
   if (authLoading) {
     return (
@@ -129,27 +160,14 @@ export default function NouvelleSortieCourteDuree() {
       }
     }
 
-    // Validations conditionnelles selon le pays et le mode
-    if (fr && frMode === "RTT") {
-      // Mode RTT: seulement valider la période
+    if (fr) {
       if (!periodeFr) {
         setFormError(
           "Veuillez sélectionner une période (Journée/Matin/Après-midi).",
         );
         return;
       }
-    } else if (fr && frMode === "2H") {
-      // Mode 2H en France: valider les heures
-      if (!heureDebut) {
-        setFormError("Veuillez renseigner l'heure de début.");
-        return;
-      }
-      if (!heureFin) {
-        setFormError("Veuillez renseigner l'heure de fin.");
-        return;
-      }
-    } else if (!fr) {
-      // Hors France (TN/MA): valider les heures
+    } else {
       if (!heureDebut) {
         setFormError("Veuillez renseigner l'heure de début.");
         return;
@@ -159,6 +177,7 @@ export default function NouvelleSortieCourteDuree() {
         return;
       }
     }
+
 
     if (!motif.trim()) {
       setFormError("Veuillez renseigner le motif.");
@@ -170,8 +189,7 @@ export default function NouvelleSortieCourteDuree() {
       return;
     }
 
-    // Contrôle de durée et limite mensuelle : seulement pour mode 2H et non-France
-    if (!fr || (fr && frMode === "2H")) {
+    if (!fr) {
       const capRest = typeof restantes === "number" ? restantes : maxMois;
       if (capRest <= 0) {
         setFormError(
@@ -192,11 +210,15 @@ export default function NouvelleSortieCourteDuree() {
       setSubmitting(true);
       await creerDemande({
         type: "sortie",
+        titre: fr ? "RTT" : "Sortie courte durée",
         dateSortie: dDeb,
         dateDebut: dDeb,
         dateFin: dFin,
-        heureDebut: fr && frMode === "RTT" ? periodeFr : heureDebut,
-        heureFin: fr && frMode === "RTT" ? periodeFr : heureFin,
+        // France RTT : demi-journée via startHalfDay/endHalfDay, pas via heureDebut
+        heureDebut: fr ? null : heureDebut,
+        heureFin: fr ? null : heureFin,
+        startHalfDay: fr && periodeFr && periodeFr !== "FULL_DAY" ? periodeFr : undefined,
+        endHalfDay: fr && periodeFr && periodeFr !== "FULL_DAY" ? periodeFr : undefined,
         motif: motif.trim(),
         approvedByAdminId: approvedByAdminId
           ? Number(approvedByAdminId)
@@ -230,20 +252,35 @@ export default function NouvelleSortieCourteDuree() {
         </div>
 
         <h1 className="text-4xl font-bold text-slate-900">
-          {fr ? "Sortie courte durée (France)" : "Autorisation courte (2 h)"}
+          {fr ? "RTT (France)" : "Autorisation courte (2 h)"}
         </h1>
 
         <p className="mt-3 text-slate-600">
           {fr
-            ? "Choisissez « RTT » (jour/demi‑journée) ou « Autorisation 2 h » (comme TN/MA)."
+            ? "RTT : choisissez une journée complète ou une demi-journée."
             : `Jusqu’à ${maxMois} autorisations de 2 h par mois calendaire (créées ou en attente). La ${maxMois + 1}ᵉ est refusée.`}
         </p>
 
+        {scheduleError && (
+          <div className="mt-4 rounded-xl border-l-4 border-red-500 bg-red-50 p-4 text-sm text-red-700">
+            {scheduleError}
+          </div>
+        )}
+        {!scheduleError && scheduleLoading && (
+          <div className="mt-4 rounded-xl border-l-4 border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            Chargement du planning RH actif...
+          </div>
+        )}
+        {!scheduleError && !scheduleLoading && activeSchedule && (
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            <span className="font-semibold">Planning RH actif :</span>{" "}
+            {activeSchedule.activeType || "NORMAL"}
+          </div>
+        )}
+
         <div
           className={`mt-6 rounded-xl border px-5 py-4 ${
-            fr
-              ? "border-violet-200 bg-violet-50"
-              : "border-amber-200 bg-amber-50"
+            fr ? "border-violet-200 bg-violet-50" : "border-amber-200 bg-amber-50"
           }`}
         >
           <div
@@ -251,40 +288,62 @@ export default function NouvelleSortieCourteDuree() {
               fr ? "text-violet-900" : "text-amber-900"
             }`}
           >
-            {fr ? "Solde / compteur" : "Autorisations 2 h ce mois-ci"}
+            {fr ? "Solde RTT" : "Autorisations 2 h ce mois-ci"}
           </div>
-          <div
-            className={`mt-1 text-xl font-bold ${fr ? "text-violet-950" : "text-amber-950"}`}
-          >
-            {fr ? (
-              <>
-                {soldeSummary
-                  ? `${soldeSummary.permission} jour(s) RTT — ${
-                      typeof restantes === "number"
-                        ? `${restantes} autorisation(s) 2 h restante(s)`
-                        : "—"
-                    }`
-                  : "—"}
-              </>
+
+          {fr ? (
+            soldeSummary?.franceRtt ? (
+              <div className="mt-3 grid grid-cols-4 gap-3 text-center">
+                <div>
+                  <div className="text-[10px] font-semibold text-violet-600 uppercase tracking-wide">Total</div>
+                  <div className="mt-0.5 text-lg font-bold text-violet-950">
+                    {formatRttJours(soldeSummary.franceRtt.total)}{" "}
+                    <span className="text-sm font-semibold text-slate-500">j</span>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] font-semibold text-violet-600 uppercase tracking-wide">Pris</div>
+                  <div className="mt-0.5 text-lg font-bold text-violet-950">
+                    {formatRttJours(soldeSummary.franceRtt.used)}{" "}
+                    <span className="text-sm font-semibold text-slate-500">j</span>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] font-semibold text-violet-600 uppercase tracking-wide">En attente</div>
+                  <div className="mt-0.5 text-lg font-bold text-violet-950">
+                    {formatRttJours(soldeSummary.franceRtt.pending)}{" "}
+                    <span className="text-sm font-semibold text-slate-500">j</span>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wide">Restant</div>
+                  <div className="mt-0.5 text-xl font-bold text-emerald-700">
+                    {formatRttJours(soldeSummary.franceRtt.remaining)}{" "}
+                    <span className="text-sm font-semibold text-slate-500">j</span>
+                  </div>
+                </div>
+              </div>
             ) : (
-              <>
-                {typeof utilisees === "number" &&
-                typeof restantes === "number" ? (
-                  <>
-                    {utilisees} / {maxMois} utilisée(s) —{" "}
-                    <span className="text-emerald-800">
-                      {restantes} restante(s)
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-sm font-medium">
-                    Solde du mois : chargez la page ou reconnectez-vous pour
-                    afficher le compteur.
+              <div className="mt-1 text-xl font-bold text-violet-950">
+                {loading ? "…" : soldeSummary ? `${soldeSummary.permission} j` : "—"}
+              </div>
+            )
+          ) : (
+            <div className={`mt-1 text-xl font-bold ${restantes === 0 ? "text-red-700" : "text-amber-950"}`}>
+              {typeof utilisees === "number" && typeof restantes === "number" ? (
+                <>
+                  {utilisees} / {maxMois} utilisée(s) —{" "}
+                  <span className={restantes > 0 ? "text-emerald-700" : "text-red-600"}>
+                    {restantes} restante(s)
                   </span>
-                )}
-              </>
-            )}
-          </div>
+                </>
+              ) : loading ? (
+                <span className="text-sm font-medium text-amber-700">Chargement…</span>
+              ) : (
+                <span className="text-sm font-medium text-amber-700">Solde indisponible — actualisez la page.</span>
+              )}
+            </div>
+          )}
         </div>
 
         {(loading || submitting) && (
@@ -319,11 +378,11 @@ export default function NouvelleSortieCourteDuree() {
                 <option value="">
                   {admins.length > 0
                     ? "Sélectionner un Super Admin"
-                    : "Super Admins indisponibles (mode compat)"}
+                    : "Aucun validateur disponible"}
                 </option>
                 {admins.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name || a.email}
+                  <option key={a.id ?? a.email ?? a.name} value={a.id}>
+                    {a.name || a.email || "Super Admin"}
                   </option>
                 ))}
               </select>
@@ -333,11 +392,12 @@ export default function NouvelleSortieCourteDuree() {
             </div>
 
             <div>
-              <label className="text-sm font-semibold text-slate-700 block mb-2">
+              <label htmlFor="sortie-date-debut" className="text-sm font-semibold text-slate-700 block mb-2">
                 {fr ? "Date début" : "Date"}{" "}
                 <span className="text-red-500">*</span>
               </label>
               <input
+                id="sortie-date-debut"
                 type="date"
                 value={dateDebut}
                 onChange={(e) => {
@@ -353,10 +413,11 @@ export default function NouvelleSortieCourteDuree() {
 
             {fr ? (
               <div>
-                <label className="text-sm font-semibold text-slate-700 block mb-2">
+                <label htmlFor="sortie-date-fin" className="text-sm font-semibold text-slate-700 block mb-2">
                   Date fin <span className="text-red-500">*</span>
                 </label>
                 <input
+                  id="sortie-date-fin"
                   type="date"
                   value={dateFin}
                   min={dateDebut}
@@ -368,91 +429,31 @@ export default function NouvelleSortieCourteDuree() {
             ) : null}
 
             {fr ? (
-              <>
-                <div className="sm:col-span-2">
-                  <label className="text-sm font-semibold text-slate-700 block mb-2">
-                    Type de demande
-                  </label>
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setFrMode("RTT")}
-                      className={`rounded-lg px-4 py-2 text-sm font-semibold border transition-all ${
-                        frMode === "RTT"
-                          ? "border-violet-600 bg-violet-600 text-white"
-                          : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
-                      }`}
-                    >
-                      RTT (jour / demi‑journée)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFrMode("2H")}
-                      className={`rounded-lg px-4 py-2 text-sm font-semibold border transition-all ${
-                        frMode === "2H"
-                          ? "border-amber-600 bg-amber-600 text-white"
-                          : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
-                      }`}
-                    >
-                      Autorisation 2 h
-                    </button>
-                  </div>
-                </div>
-
-                {frMode === "RTT" ? (
-                  <div className="sm:col-span-2">
-                    <label className="text-sm font-semibold text-slate-700 block mb-2">
-                      Période RTT
-                    </label>
-                    <select
-                      value={periodeFr}
-                      onChange={(e) => setPeriodeFr(e.target.value)}
-                      className="w-full border border-slate-200 rounded-lg px-4 py-2.5 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      required
-                    >
-                      <option value="">-- Sélectionner --</option>
-                      <option value="FULL_DAY">Journée complète</option>
-                      <option value="MORNING">Matin (0.5)</option>
-                      <option value="AFTERNOON">Après-midi (0.5)</option>
-                    </select>
-                  </div>
-                ) : (
-                  <>
-                    <div>
-                      <label className="text-sm font-semibold text-slate-700 block mb-2">
-                        Heure début <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="time"
-                        value={heureDebut}
-                        onChange={(e) => setHeureDebut(e.target.value)}
-                        className="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-semibold text-slate-700 block mb-2">
-                        Heure fin <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="time"
-                        value={heureFin}
-                        readOnly
-                        className="w-full border border-slate-200 rounded-lg px-4 py-2.5 bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      />
-                      <p className="mt-1 text-xs text-slate-500">
-                        Calculée automatiquement : début + 2 h (règle métier).
-                      </p>
-                    </div>
-                  </>
-                )}
-              </>
+              <div className="sm:col-span-2">
+                <label htmlFor="sortie-periode" className="text-sm font-semibold text-slate-700 block mb-2">
+                  Période RTT
+                </label>
+                <select
+                  id="sortie-periode"
+                  value={periodeFr}
+                  onChange={(e) => setPeriodeFr(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg px-4 py-2.5 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  required
+                >
+                  <option value="">-- Sélectionner --</option>
+                  <option value="FULL_DAY">Journée complète</option>
+                  <option value="MORNING">Matin (0.5)</option>
+                  <option value="AFTERNOON">Après-midi (0.5)</option>
+                </select>
+              </div>
             ) : (
               <>
                 <div>
-                  <label className="text-sm font-semibold text-slate-700 block mb-2">
+                  <label htmlFor="sortie-heure-debut" className="text-sm font-semibold text-slate-700 block mb-2">
                     Heure début <span className="text-red-500">*</span>
                   </label>
                   <input
+                    id="sortie-heure-debut"
                     type="time"
                     value={heureDebut}
                     onChange={(e) => setHeureDebut(e.target.value)}
@@ -461,32 +462,29 @@ export default function NouvelleSortieCourteDuree() {
                 </div>
 
                 <div>
-                  <label className="text-sm font-semibold text-slate-700 block mb-2">
+                  <label htmlFor="sortie-heure-fin" className="text-sm font-semibold text-slate-700 block mb-2">
                     Heure fin <span className="text-red-500">*</span>
                   </label>
                   <input
+                    id="sortie-heure-fin"
                     type="time"
                     value={heureFin}
-                    readOnly={!fr}
-                    onChange={(e) => fr && setHeureFin(e.target.value)}
-                    className={`w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
-                      !fr ? "bg-slate-50 text-slate-700" : ""
-                    }`}
+                    readOnly
+                    className="w-full border border-slate-200 rounded-lg px-4 py-2.5 bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   />
-                  {!fr ? (
-                    <p className="mt-1 text-xs text-slate-500">
-                      Calculée automatiquement : début + 2 h (règle métier).
-                    </p>
-                  ) : null}
+                  <p className="mt-1 text-xs text-slate-500">
+                    Calculée automatiquement : début + 2 h (règle métier).
+                  </p>
                 </div>
               </>
             )}
 
             <div className="sm:col-span-2">
-              <label className="text-sm font-semibold text-slate-700 block mb-2">
+              <label htmlFor="sortie-motif" className="text-sm font-semibold text-slate-700 block mb-2">
                 Motif <span className="text-red-500">*</span>
               </label>
               <textarea
+                id="sortie-motif"
                 value={motif}
                 onChange={(e) => setMotif(e.target.value)}
                 className="w-full min-h-[120px] resize-y border border-slate-200 rounded-lg px-4 py-2.5 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -509,6 +507,22 @@ export default function NouvelleSortieCourteDuree() {
                 </div>
               </div>
             </div>
+          )}
+
+          {dateDebut && (
+            <AIScoreCard
+              demandeData={{
+                titre: fr ? "RTT" : "Sortie courte durée",
+                dateDebut,
+                dateFin: dateDebut,
+                heureDebut,
+                heureFin,
+                commentaire: motif,
+                typeConge: "SORTIE_COURTE",
+              }}
+              userId={user?.id}
+              isLoading={loading}
+            />
           )}
 
           <div className="mt-8 flex gap-4 justify-end">

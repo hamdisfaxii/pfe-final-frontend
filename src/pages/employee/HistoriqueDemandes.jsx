@@ -7,6 +7,7 @@ import ModalConfirmation from "../../components/commun/ModalConfirmation";
 import Spinner from "../../components/commun/Spinner";
 import { formaterDate } from "../../utils/calculJours";
 import { libelleAffichageTypeConge } from "../../utils/country";
+import { useAuth } from "../../context/authcontext";
 
 const normalizeForStatus = (statut) => {
   const raw = String(statut ?? "")
@@ -27,13 +28,21 @@ const pickId = (demande) => demande?.id ?? demande?._id ?? demande?.ID;
 export default function HistoriqueDemandes() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const { demandes, loading, error, fetchDemandes, annulerDemande } =
     useDemandes();
 
   const statusFromQuery = useMemo(() => {
     const q = new URLSearchParams(location.search).get("statut");
-    const allowed = new Set(["tous", "attente", "validee", "refusée", "annulée"]);
-    return allowed.has(q) ? q : "tous";
+    const allowed = new Set([
+      "tous",
+      "attente",
+      "validee",
+      "refusee",
+      "annulee",
+    ]);
+    if (q == null) return null;
+    return allowed.has(q) ? q : null;
   }, [location.search]);
 
   const years = useMemo(() => {
@@ -45,7 +54,7 @@ export default function HistoriqueDemandes() {
 
   const [filters, setFilters] = useState({
     annee: String(new Date().getFullYear()),
-    statut: statusFromQuery,
+    statut: statusFromQuery ?? "tous",
   });
 
   const [page, setPage] = useState(1);
@@ -213,13 +222,11 @@ export default function HistoriqueDemandes() {
                             <td className="p-4 text-slate-700">
                               {(() => {
                                 const raw =
-                                  titre ??
-                                  demande?.typeConge ??
-                                  demande?.type;
+                                  titre ?? demande?.typeConge ?? demande?.type;
                                 if (raw == null || String(raw).trim() === "") {
                                   return "--";
                                 }
-                                return libelleAffichageTypeConge(raw);
+                                return libelleAffichageTypeConge(raw, user?.country ?? user?.pays);
                               })()}
                             </td>
                             <td className="p-4">

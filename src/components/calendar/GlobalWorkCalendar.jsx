@@ -39,10 +39,12 @@ function parseIsoLocal(iso) {
   const y = Number(m[1]);
   const mo = Number(m[2]);
   const d = Number(m[3]);
-  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return null;
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d))
+    return null;
   const dt = new Date(y, mo - 1, d);
   if (Number.isNaN(dt.getTime())) return null;
-  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d)
+    return null;
   return dt;
 }
 
@@ -57,7 +59,9 @@ function overlapsCalendarYear(sd, ed, year) {
 
 function countryStatsFromEvents(yearEvents, year) {
   return HR_COUNTRY_LIST.map(({ code, label, flag }) => {
-    const forCountry = yearEvents.filter((e) => normalizeCountryIsoForHr(e.country) === code);
+    const forCountry = yearEvents.filter(
+      (e) => normalizeCountryIsoForHr(e.country) === code,
+    );
 
     const holidayDates = new Set();
     const leaveRows = [];
@@ -65,12 +69,17 @@ function countryStatsFromEvents(yearEvents, year) {
     forCountry.forEach((e) => {
       if (!overlapsCalendarYear(e.startDate, e.endDate, year)) return;
       if (e.eventType === "HOLIDAY") holidayDates.add(String(e.startDate));
-      else if (e.eventType === "APPROVED_LEAVE" || e.eventType === "MY_LEAVE_PENDING") {
+      else if (
+        e.eventType === "APPROVED_LEAVE" ||
+        e.eventType === "MY_LEAVE_PENDING"
+      ) {
         leaveRows.push(e);
       }
     });
 
-    const uniqueEmployees = new Set(leaveRows.map((r) => r.userId).filter((id) => id != null));
+    const uniqueEmployees = new Set(
+      leaveRows.map((r) => r.userId).filter((id) => id != null),
+    );
 
     return {
       code,
@@ -91,7 +100,10 @@ function employeeOverviewFromEvents(events, year, countryIso, employeeId) {
   let pending = [];
   events.forEach((e) => {
     if (!overlapsCalendarYear(e.startDate, e.endDate, year)) return;
-    if (e.eventType === "HOLIDAY" && normalizeCountryIsoForHr(e.country) === cc) {
+    if (
+      e.eventType === "HOLIDAY" &&
+      normalizeCountryIsoForHr(e.country) === cc
+    ) {
       holidays.add(String(e.startDate));
     }
     const mine = employeeId != null && String(e.userId) === String(employeeId);
@@ -129,11 +141,15 @@ export default function GlobalWorkCalendar({
   const [popoverIso, setPopoverIso] = useState(null);
 
   const calendarYear = cursorDate.getFullYear();
-  const lockedCountry = useMemo(() => normalizeCountryIsoForHr(employeeCountryIso) || "TN", [employeeCountryIso]);
+  const lockedCountry = useMemo(
+    () => normalizeCountryIsoForHr(employeeCountryIso) || "TN",
+    [employeeCountryIso],
+  );
 
   const filteredEvents = useMemo(() => {
     if (isEmployee) return events;
     return events.filter((ev) => {
+      if (ev.eventType !== "HOLIDAY") return false;
       if (countryFilter === "ALL") return true;
       return normalizeCountryIsoForHr(ev.country) === countryFilter;
     });
@@ -144,7 +160,10 @@ export default function GlobalWorkCalendar({
       const t = event.title || "Jour férié";
       return `${code} — ${t}`;
     }
-    return event.title || `${event.employeeName || "Employé"} — ${event.leaveType || "Congé"}`;
+    return (
+      event.title ||
+      `${event.employeeName || "Employé"} — ${event.leaveType || "Congé"}`
+    );
   };
 
   const rhEventBarClass = (event) =>
@@ -156,13 +175,23 @@ export default function GlobalWorkCalendar({
   };
 
   const rangeStart = useMemo(() => {
-    if (viewMode === "day") return new Date(cursorDate.getFullYear(), cursorDate.getMonth(), cursorDate.getDate());
+    if (viewMode === "day")
+      return new Date(
+        cursorDate.getFullYear(),
+        cursorDate.getMonth(),
+        cursorDate.getDate(),
+      );
     if (viewMode === "week") return startOfWeek(cursorDate);
     return startOfMonth(cursorDate);
   }, [cursorDate, viewMode]);
 
   const rangeEnd = useMemo(() => {
-    if (viewMode === "day") return new Date(cursorDate.getFullYear(), cursorDate.getMonth(), cursorDate.getDate());
+    if (viewMode === "day")
+      return new Date(
+        cursorDate.getFullYear(),
+        cursorDate.getMonth(),
+        cursorDate.getDate(),
+      );
     if (viewMode === "week") return endOfWeek(cursorDate);
     return endOfMonth(cursorDate);
   }, [cursorDate, viewMode]);
@@ -183,8 +212,8 @@ export default function GlobalWorkCalendar({
 
   useEffect(() => {
     const loadEvents = async () => {
-      setLoading(true);
       setError("");
+      setLoading(true);
       try {
         const startDate = `${calendarYear}-01-01`;
         const endDate = `${calendarYear}-12-31`;
@@ -192,7 +221,6 @@ export default function GlobalWorkCalendar({
         if (isEmployee) {
           if (employeeId == null) {
             setEvents([]);
-            setLoading(false);
             return;
           }
           params.employeeId = employeeId;
@@ -203,12 +231,17 @@ export default function GlobalWorkCalendar({
       } catch {
         setEvents([]);
         setError("Impossible de charger les événements du calendrier.");
-      } finally {
-        setLoading(false);
       }
     };
 
-    loadEvents();
+    loadEvents().finally(() => setLoading(false));
+
+    // Poll for updates every 10 seconds to sync with changes made in other tabs/pages
+    const interval = setInterval(() => {
+      loadEvents();
+    }, 10000);
+
+    return () => clearInterval(interval);
   }, [calendarYear, isEmployee, employeeId, lockedCountry]);
 
   const statsByCountry = useMemo(
@@ -217,7 +250,13 @@ export default function GlobalWorkCalendar({
   );
 
   const employeeOverview = useMemo(
-    () => employeeOverviewFromEvents(events, calendarYear, lockedCountry, employeeId),
+    () =>
+      employeeOverviewFromEvents(
+        events,
+        calendarYear,
+        lockedCountry,
+        employeeId,
+      ),
     [events, calendarYear, lockedCountry, employeeId],
   );
 
@@ -253,7 +292,8 @@ export default function GlobalWorkCalendar({
   const goPrev = () =>
     setCursorDate((prev) => {
       const d = new Date(prev);
-      if (viewMode === "month" || viewMode === "list") d.setMonth(d.getMonth() - 1);
+      if (viewMode === "month" || viewMode === "list")
+        d.setMonth(d.getMonth() - 1);
       else if (viewMode === "week") d.setDate(d.getDate() - 7);
       else d.setDate(d.getDate() - 1);
       return d;
@@ -261,7 +301,8 @@ export default function GlobalWorkCalendar({
   const goNext = () =>
     setCursorDate((prev) => {
       const d = new Date(prev);
-      if (viewMode === "month" || viewMode === "list") d.setMonth(d.getMonth() + 1);
+      if (viewMode === "month" || viewMode === "list")
+        d.setMonth(d.getMonth() + 1);
       else if (viewMode === "week") d.setDate(d.getDate() + 7);
       else d.setDate(d.getDate() + 1);
       return d;
@@ -291,7 +332,9 @@ export default function GlobalWorkCalendar({
       type="button"
       onClick={onClick}
       className={`px-2 sm:px-2.5 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors ${
-        active ? "bg-zinc-950 text-white shadow-inner" : "text-white/90 hover:bg-zinc-700/90"
+        active
+          ? "bg-zinc-950 text-white shadow-inner"
+          : "text-white/90 hover:bg-zinc-700/90"
       }`}
       aria-current={active ? "page" : undefined}
     >
@@ -338,7 +381,9 @@ export default function GlobalWorkCalendar({
               value={calendarYear}
               onChange={(e) => {
                 const y = Number(e.target.value);
-                setCursorDate((d) => new Date(y, d.getMonth(), Math.min(d.getDate(), 28)));
+                setCursorDate(
+                  (d) => new Date(y, d.getMonth(), Math.min(d.getDate(), 28)),
+                );
               }}
             >
               {yearOptions.map((y) => (
@@ -367,7 +412,8 @@ export default function GlobalWorkCalendar({
                 title="Pays utilisé pour les jours fériés et le filtrage RH"
               >
                 <span aria-hidden>{employeeOverview.flag}</span>{" "}
-                <span className="font-semibold">{lockedCountry}</span> {employeeOverview.label}
+                <span className="font-semibold">{lockedCountry}</span>{" "}
+                {employeeOverview.label}
               </div>
             )}
           </div>
@@ -384,9 +430,13 @@ export default function GlobalWorkCalendar({
                     {employeeOverview.flag}
                   </span>
                   <span className="shrink-0 font-bold">{lockedCountry}</span>
-                  <span className="truncate font-medium">{employeeOverview.label}</span>
+                  <span className="truncate font-medium">
+                    {employeeOverview.label}
+                  </span>
                 </span>
-                <span className="text-[10px] text-slate-400 tabular-nums shrink-0">Année {calendarYear}</span>
+                <span className="text-[10px] text-slate-400 tabular-nums shrink-0">
+                  Année {calendarYear}
+                </span>
               </div>
               <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-[11px]">
                 <dt className="text-slate-500">Jours fériés RH (votre pays)</dt>
@@ -421,15 +471,15 @@ export default function GlobalWorkCalendar({
                     <span className="shrink-0 font-bold">{row.code}</span>
                     <span className="truncate font-medium">{row.label}</span>
                   </span>
-                  <span className="text-[10px] text-slate-400 tabular-nums shrink-0">Année {calendarYear}</span>
+                  <span className="text-[10px] text-slate-400 tabular-nums shrink-0">
+                    Année {calendarYear}
+                  </span>
                 </div>
                 <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-[11px]">
                   <dt className="text-slate-500">Jours fériés</dt>
-                  <dd className="text-right font-semibold text-slate-900 tabular-nums">{row.holidays}</dd>
-                  <dt className="text-slate-500">Employés (demandes)</dt>
-                  <dd className="text-right font-semibold text-slate-900 tabular-nums">{row.employeesViaDemandes}</dd>
-                  <dt className="text-slate-500">Congés (demandes)</dt>
-                  <dd className="text-right font-semibold text-slate-900 tabular-nums">{row.congesViaDemandes}</dd>
+                  <dd className="text-right font-semibold text-slate-900 tabular-nums">
+                    {row.holidays}
+                  </dd>
                 </dl>
               </div>
             ))}
@@ -472,10 +522,26 @@ export default function GlobalWorkCalendar({
               </div>
 
               <div className="inline-flex flex-wrap justify-center sm:justify-end rounded-md bg-zinc-800 p-0.5 shadow-sm gap-0.5 order-3 sm:order-none w-full sm:w-auto">
-                {segmentedBtn(viewMode === "list", () => setViewMode("list"), "Vue liste")}
-                {segmentedBtn(viewMode === "month", () => setViewMode("month"), "Vue mois")}
-                {segmentedBtn(viewMode === "week", () => setViewMode("week"), "Vue semaine")}
-                {segmentedBtn(viewMode === "day", () => setViewMode("day"), "Vue jour")}
+                {segmentedBtn(
+                  viewMode === "list",
+                  () => setViewMode("list"),
+                  "Vue liste",
+                )}
+                {segmentedBtn(
+                  viewMode === "month",
+                  () => setViewMode("month"),
+                  "Vue mois",
+                )}
+                {segmentedBtn(
+                  viewMode === "week",
+                  () => setViewMode("week"),
+                  "Vue semaine",
+                )}
+                {segmentedBtn(
+                  viewMode === "day",
+                  () => setViewMode("day"),
+                  "Vue jour",
+                )}
               </div>
             </div>
 
@@ -504,19 +570,25 @@ export default function GlobalWorkCalendar({
                   </div>
 
                   {weeks.map((week, weekIndex) => (
-                    <div key={`week-${weekIndex}`} className="grid grid-cols-7 min-w-0">
+                    <div
+                      key={`week-${weekIndex}`}
+                      className="grid grid-cols-7 min-w-0"
+                    >
                       {week.map((cell, dayIndex) => {
                         const cellEvents = eventsByDate.get(cell.iso) || [];
                         const visible = cellEvents.slice(0, 2);
                         const hiddenCount = cellEvents.length - visible.length;
                         const isToday = cell.iso === todayIso;
-                        const codeFor = (e) => normalizeCountryIsoForHr(e.country);
+                        const codeFor = (e) =>
+                          normalizeCountryIsoForHr(e.country);
 
                         return (
                           <button
                             type="button"
                             key={`${weekIndex}-${dayIndex}`}
-                            onClick={() => cellEvents.length > 0 && setPopoverIso(cell.iso)}
+                            onClick={() =>
+                              cellEvents.length > 0 && setPopoverIso(cell.iso)
+                            }
                             className={`relative min-h-[5.5rem] sm:min-h-[6rem] min-w-0 border-r border-b border-slate-200 p-1 sm:p-1.5 text-left align-top transition-colors hover:bg-slate-50/80 last:border-r-0 ${
                               cell.inCurrentMonth ? "bg-white" : "bg-slate-100"
                             } ${cellEvents.length > 0 ? "cursor-pointer" : "cursor-default"}`}
@@ -539,7 +611,10 @@ export default function GlobalWorkCalendar({
                                 <div
                                   key={`${cell.iso}-${idx}-${event.demandeId ?? event.title}-${idx}`}
                                   className={rhEventBarClass(event)}
-                                  title={eventDisplayLine(event, codeFor(event))}
+                                  title={eventDisplayLine(
+                                    event,
+                                    codeFor(event),
+                                  )}
                                   onClick={(ev) => {
                                     ev.stopPropagation();
                                     setPopoverIso(cell.iso);
@@ -594,7 +669,9 @@ export default function GlobalWorkCalendar({
                         <div className="flex justify-end mb-1">
                           <span
                             className={`tabular-nums text-[11px] ${
-                              isTodayCell ? "font-bold text-blue-600" : "text-slate-800"
+                              isTodayCell
+                                ? "font-bold text-blue-600"
+                                : "text-slate-800"
                             }`}
                           >
                             {cell.date.getDate()}
@@ -602,12 +679,17 @@ export default function GlobalWorkCalendar({
                         </div>
                         <div className="space-y-0.5">
                           {cellEvents.length === 0 && (
-                            <div className="text-[10px] text-slate-400">Aucun événement</div>
+                            <div className="text-[10px] text-slate-400">
+                              Aucun événement
+                            </div>
                           )}
                           {cellEvents.map((event, idx) => {
                             const c = normalizeCountryIsoForHr(event.country);
                             return (
-                              <div key={`${cell.iso}-w-${idx}`} className={rhEventBarClass(event)}>
+                              <div
+                                key={`${cell.iso}-w-${idx}`}
+                                className={rhEventBarClass(event)}
+                              >
                                 {eventDisplayLine(event, c)}
                               </div>
                             );
@@ -640,7 +722,10 @@ export default function GlobalWorkCalendar({
                         key={`${dayIso}-d-${idx}`}
                         className={`rounded-md px-2.5 py-1.5 text-xs ${calendarEventClassesForCountry(event.country)}`}
                       >
-                        {eventDisplayLine(event, normalizeCountryIsoForHr(event.country))}
+                        {eventDisplayLine(
+                          event,
+                          normalizeCountryIsoForHr(event.country),
+                        )}
                       </div>
                     ))}
                   </div>
@@ -653,18 +738,29 @@ export default function GlobalWorkCalendar({
                     <table className="min-w-full text-[11px] sm:text-xs">
                       <thead className="bg-slate-50">
                         <tr>
-                          <th className="px-2 py-1.5 text-left font-semibold text-slate-700">Date</th>
-                          <th className="px-2 py-1.5 text-left font-semibold text-slate-700">Type</th>
-                          <th className="px-2 py-1.5 text-left font-semibold text-slate-700">Titre</th>
+                          <th className="px-2 py-1.5 text-left font-semibold text-slate-700">
+                            Date
+                          </th>
+                          <th className="px-2 py-1.5 text-left font-semibold text-slate-700">
+                            Type
+                          </th>
+                          <th className="px-2 py-1.5 text-left font-semibold text-slate-700">
+                            Titre
+                          </th>
                           {isEmployee ? null : (
-                            <th className="px-2 py-1.5 text-left font-semibold text-slate-700">Pays</th>
+                            <th className="px-2 py-1.5 text-left font-semibold text-slate-700">
+                              Pays
+                            </th>
                           )}
                         </tr>
                       </thead>
                       <tbody>
                         {listEvents.length === 0 && (
                           <tr>
-                            <td colSpan={isEmployee ? 3 : 4} className="px-2 py-3 text-center text-slate-500">
+                            <td
+                              colSpan={isEmployee ? 3 : 4}
+                              className="px-2 py-3 text-center text-slate-500"
+                            >
                               Aucun événement.
                             </td>
                           </tr>
@@ -677,12 +773,19 @@ export default function GlobalWorkCalendar({
                             <td className="px-2 py-1.5 text-slate-700 whitespace-nowrap">
                               {event.startDate || "-"}
                             </td>
-                            <td className="px-2 py-1.5 text-slate-700">{event.eventType || "-"}</td>
+                            <td className="px-2 py-1.5 text-slate-700">
+                              {event.eventType || "-"}
+                            </td>
                             <td className="px-2 py-1.5 text-slate-700 max-w-[200px] truncate sm:max-w-xs">
-                              {eventDisplayLine(event, normalizeCountryIsoForHr(event.country))}
+                              {eventDisplayLine(
+                                event,
+                                normalizeCountryIsoForHr(event.country),
+                              )}
                             </td>
                             {!isEmployee ? (
-                              <td className="px-2 py-1.5 text-slate-700">{event.country || "-"}</td>
+                              <td className="px-2 py-1.5 text-slate-700">
+                                {event.country || "-"}
+                              </td>
                             ) : null}
                           </tr>
                         ))}
@@ -700,7 +803,9 @@ export default function GlobalWorkCalendar({
             </div>
           )}
           {!loading && error && (
-            <div className="border-t border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">{error}</div>
+            <div className="border-t border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">
+              {error}
+            </div>
           )}
         </div>
       </div>
@@ -718,7 +823,10 @@ export default function GlobalWorkCalendar({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-2 mb-3">
-              <h2 id="cal-pop-title" className="text-sm font-semibold text-slate-900 capitalize">
+              <h2
+                id="cal-pop-title"
+                className="text-sm font-semibold text-slate-900 capitalize"
+              >
                 {popoverDate ? longDateLabelFr(popoverDate) : ""}
               </h2>
               <button
@@ -732,14 +840,19 @@ export default function GlobalWorkCalendar({
             </div>
             <div className="max-h-[min(42vh,20rem)] space-y-1.5 overflow-y-auto pr-0.5">
               {popoverEvents.length === 0 ? (
-                <p className="text-xs text-slate-500">Aucun événement pour ce jour.</p>
+                <p className="text-xs text-slate-500">
+                  Aucun événement pour ce jour.
+                </p>
               ) : (
                 popoverEvents.map((event, idx) => (
                   <div
                     key={`pop-${popoverIso}-${idx}-${event.demandeId}-${event.title}`}
                     className={`rounded-md px-2 py-1.5 text-[11px] leading-snug break-words ${calendarEventClassesForCountry(event.country)}`}
                   >
-                    {eventDisplayLine(event, normalizeCountryIsoForHr(event.country))}
+                    {eventDisplayLine(
+                      event,
+                      normalizeCountryIsoForHr(event.country),
+                    )}
                   </div>
                 ))
               )}

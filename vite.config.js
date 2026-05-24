@@ -8,6 +8,19 @@ export default defineConfig({
     extensions: [".js", ".jsx"],
   },
   server: {
-    historyApiFallback: true, // Ajout pour gérer les routes SPA
+    host: true,
+    proxy: {
+      "/api": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+        headers: {
+          origin: "http://localhost:5173",
+        },
+      },
+    },
+    historyApiFallback: true,
+    headers: {
+      "Access-Control-Allow-Private-Network": "true",
+    },
   },
 });

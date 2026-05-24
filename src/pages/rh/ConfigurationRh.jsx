@@ -65,6 +65,7 @@ export default function ConfigurationRh() {
     summerEnabled: true,
     ramadanEnabled: true,
   });
+  const [pendingActiveType, setPendingActiveType] = useState("NORMAL");
   const [scheduleRows, setScheduleRows] = useState([]);
   const [editingCell, setEditingCell] = useState(null);
   const [editingTimes, setEditingTimes] = useState({
@@ -77,18 +78,21 @@ export default function ConfigurationRh() {
     [activeCountry],
   );
 
-  const load = useCallback(async (countryCode = activeCountry) => {
-    setLoading(true);
-    setError("");
-    try {
-      setRows(await getExceptionalLeaves(countryCode));
-    } catch {
-      setRows([]);
-      setError("Impossible de charger les congés exceptionnels.");
-    } finally {
-      setLoading(false);
-    }
-  }, [activeCountry]);
+  const load = useCallback(
+    async (countryCode = activeCountry) => {
+      setLoading(true);
+      setError("");
+      try {
+        setRows(await getExceptionalLeaves(countryCode));
+      } catch {
+        setRows([]);
+        setError("Impossible de charger les congés exceptionnels.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [activeCountry],
+  );
 
   useEffect(() => {
     load(activeCountry);
@@ -100,45 +104,67 @@ export default function ConfigurationRh() {
     const userCountry = String(user?.country ?? "")
       .trim()
       .toUpperCase();
-    if (userCountry && COUNTRIES.some((c) => c.code === userCountry) && userCountry !== activeCountry) {
+    if (
+      userCountry &&
+      COUNTRIES.some((c) => c.code === userCountry) &&
+      userCountry !== activeCountry
+    ) {
       setActiveCountry(userCountry);
     }
   }, [user?.country, activeCountry]);
 
-  const loadSchedule = useCallback(async (country = activeCountry, type = scheduleType) => {
-    setScheduleLoading(true);
-    setScheduleError("");
-    try {
-      const data = await getWorkSchedules(country, type);
-      const resolvedActiveType = String(data?.activeType || type).toUpperCase();
-      setScheduleOptions(toExclusiveOptions(resolvedActiveType));
-      const incoming = Array.isArray(data?.rows) ? data.rows : [];
-      const byDay = new Map(incoming.map((r) => [r.dayOfWeek, r]));
-      const fullRows = DAYS.map((d) => {
-        const row = byDay.get(d.idx) || {};
-        return {
-          dayOfWeek: d.idx,
-          firstStart: toInputTime(row.firstStart),
-          firstEnd: toInputTime(row.firstEnd),
-          secondStart: toInputTime(row.secondStart),
-          secondEnd: toInputTime(row.secondEnd),
-        };
-      });
-      setScheduleRows(fullRows);
-    } catch {
-      setScheduleRows(DAYS.map((d) => ({ dayOfWeek: d.idx, firstStart: "", firstEnd: "", secondStart: "", secondEnd: "" })));
-      setScheduleError("Impossible de charger les horaires de travail.");
-    } finally {
-      setScheduleLoading(false);
-    }
-  }, [activeCountry, scheduleType]);
+  const loadSchedule = useCallback(
+    async (country = activeCountry, type = scheduleType) => {
+      setScheduleLoading(true);
+      setScheduleError("");
+      try {
+        const data = await getWorkSchedules(country, type);
+        const resolvedActiveType = String(
+          data?.activeType || type,
+        ).toUpperCase();
+        setScheduleOptions(toExclusiveOptions(resolvedActiveType));
+        setPendingActiveType(resolvedActiveType);
+        const incoming = Array.isArray(data?.rows) ? data.rows : [];
+        const byDay = new Map(incoming.map((r) => [r.dayOfWeek, r]));
+        const fullRows = DAYS.map((d) => {
+          const row = byDay.get(d.idx) || {};
+          return {
+            dayOfWeek: d.idx,
+            firstStart: toInputTime(row.firstStart),
+            firstEnd: toInputTime(row.firstEnd),
+            secondStart: toInputTime(row.secondStart),
+            secondEnd: toInputTime(row.secondEnd),
+          };
+        });
+        setScheduleRows(fullRows);
+      } catch {
+        setScheduleRows(
+          DAYS.map((d) => ({
+            dayOfWeek: d.idx,
+            firstStart: "",
+            firstEnd: "",
+            secondStart: "",
+            secondEnd: "",
+          })),
+        );
+        setScheduleError("Impossible de charger les horaires de travail.");
+      } finally {
+        setScheduleLoading(false);
+      }
+    },
+    [activeCountry, scheduleType],
+  );
 
   useEffect(() => {
     loadSchedule(activeCountry, scheduleType);
     setEditingCell(null);
   }, [activeCountry, scheduleType, loadSchedule]);
 
-  const persistSchedule = async (nextRows, nextOptions = scheduleOptions, nextType = scheduleType) => {
+  const persistSchedule = async (
+    nextRows,
+    nextOptions = scheduleOptions,
+    nextType = scheduleType,
+  ) => {
     setScheduleSaving(true);
     setScheduleError("");
     try {
@@ -158,8 +184,11 @@ export default function ConfigurationRh() {
         })),
       };
       const saved = await saveWorkSchedules(payload);
-      const resolvedActiveType = String(saved?.activeType || nextType).toUpperCase();
+      const resolvedActiveType = String(
+        saved?.activeType || nextType,
+      ).toUpperCase();
       setScheduleOptions(toExclusiveOptions(resolvedActiveType));
+      setPendingActiveType(resolvedActiveType);
       const incoming = Array.isArray(saved?.rows) ? saved.rows : [];
       const byDay = new Map(incoming.map((r) => [r.dayOfWeek, r]));
       setScheduleRows(
@@ -181,13 +210,14 @@ export default function ConfigurationRh() {
     }
   };
 
-  const selectSingleSchedule = async (type) => {
-    const next = toExclusiveOptions(type);
-    setScheduleOptions(next);
-    await persistSchedule(scheduleRows, next, scheduleType);
-    if (scheduleType !== type) {
-      setScheduleType(type);
-    }
+  const queueScheduleActivation = (type) => {
+    setPendingActiveType(type);
+  };
+
+  const confirmScheduleActivation = async () => {
+    if (pendingActiveType === scheduleOptions.activeType) return;
+    const nextOptions = toExclusiveOptions(pendingActiveType);
+    await persistSchedule(scheduleRows, nextOptions, scheduleType);
   };
 
   const activateTab = (type) => {
@@ -211,9 +241,17 @@ export default function ConfigurationRh() {
     const nextRows = scheduleRows.map((row) => {
       if (row.dayOfWeek !== dayOfWeek) return row;
       if (session === 1) {
-        return { ...row, firstStart: editingTimes.start, firstEnd: editingTimes.end };
+        return {
+          ...row,
+          firstStart: editingTimes.start,
+          firstEnd: editingTimes.end,
+        };
       }
-      return { ...row, secondStart: editingTimes.start, secondEnd: editingTimes.end };
+      return {
+        ...row,
+        secondStart: editingTimes.start,
+        secondEnd: editingTimes.end,
+      };
     });
     setScheduleRows(nextRows);
     setEditingCell(null);
@@ -230,7 +268,9 @@ export default function ConfigurationRh() {
         daysPerYear: row.daysPerYear,
         enabled: !row.enabled,
       });
-      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, ...updated } : r)));
+      setRows((prev) =>
+        prev.map((r) => (r.id === row.id ? { ...r, ...updated } : r)),
+      );
     } catch {
       setError("Impossible de mettre à jour l'état du congé.");
     } finally {
@@ -249,7 +289,9 @@ export default function ConfigurationRh() {
         enabled: row.enabled,
       });
       setEditingId(null);
-      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, ...updated } : r)));
+      setRows((prev) =>
+        prev.map((r) => (r.id === row.id ? { ...r, ...updated } : r)),
+      );
     } catch {
       setError("Impossible de sauvegarder le nombre de jours.");
     } finally {
@@ -301,7 +343,9 @@ export default function ConfigurationRh() {
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-6xl mx-auto px-6 py-10">
         <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100 fade-in-up">
-          <h1 className="text-4xl font-bold text-sky-600">Congés exceptionnels</h1>
+          <h1 className="text-4xl font-bold text-sky-600">
+            Congés exceptionnels
+          </h1>
 
           <div className="mt-6">
             <button
@@ -385,16 +429,29 @@ export default function ConfigurationRh() {
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-100 text-left text-slate-700 border-b border-slate-200">
                   <tr>
-                    <th className="p-3 font-semibold text-slate-900">Libellé</th>
-                    <th className="p-3 font-semibold text-slate-900">Nbr jrs/an</th>
-                    <th className="p-3 font-semibold text-slate-900">Modifier</th>
-                    <th className="p-3 font-semibold text-slate-900">Appliquer</th>
-                    <th className="p-3 font-semibold text-slate-900">Supprimer</th>
+                    <th className="p-3 font-semibold text-slate-900">
+                      Libellé
+                    </th>
+                    <th className="p-3 font-semibold text-slate-900">
+                      Nbr jrs/an
+                    </th>
+                    <th className="p-3 font-semibold text-slate-900">
+                      Modifier
+                    </th>
+                    <th className="p-3 font-semibold text-slate-900">
+                      Appliquer
+                    </th>
+                    <th className="p-3 font-semibold text-slate-900">
+                      Supprimer
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((row) => (
-                    <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50">
+                    <tr
+                      key={row.id}
+                      className="border-t border-slate-100 hover:bg-slate-50"
+                    >
                       <td className="p-3 text-slate-700">{row.label}</td>
                       <td className="p-3 text-slate-700">
                         {editingId === row.id ? (
@@ -457,7 +514,10 @@ export default function ConfigurationRh() {
                   ))}
                   {rows.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="p-6 text-center text-slate-500">
+                      <td
+                        colSpan={5}
+                        className="p-6 text-center text-slate-500"
+                      >
                         Aucun congé exceptionnel configuré.
                       </td>
                     </tr>
@@ -468,35 +528,55 @@ export default function ConfigurationRh() {
           )}
 
           <div className="mt-12 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-2xl font-bold text-sky-700">Horaires de travail</h2>
+            <h2 className="text-2xl font-bold text-sky-700">
+              Horaires de travail
+            </h2>
 
             <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
               <div className="flex flex-wrap items-center gap-3">
-                <span className="text-sm font-semibold text-slate-700">Horaires :</span>
+                <span className="text-sm font-semibold text-slate-700">
+                  Type d'horaire actif :
+                </span>
                 <label className="inline-flex items-center gap-2 text-sm text-slate-700">
                   <input
-                    type="checkbox"
-                    checked={scheduleOptions.activeType === "NORMAL"}
-                    onChange={(e) => e.target.checked && selectSingleSchedule("NORMAL")}
+                    type="radio"
+                    name="activeSchedule"
+                    checked={pendingActiveType === "NORMAL"}
+                    onChange={() => queueScheduleActivation("NORMAL")}
+                    className="h-4 w-4 accent-blue-600"
                   />
                   <span>Normal</span>
                 </label>
                 <label className="inline-flex items-center gap-2 text-sm text-slate-700">
                   <input
-                    type="checkbox"
-                    checked={scheduleOptions.activeType === "SUMMER"}
-                    onChange={(e) => e.target.checked && selectSingleSchedule("SUMMER")}
+                    type="radio"
+                    name="activeSchedule"
+                    checked={pendingActiveType === "SUMMER"}
+                    onChange={() => queueScheduleActivation("SUMMER")}
+                    className="h-4 w-4 accent-blue-600"
                   />
                   <span>Été</span>
                 </label>
                 <label className="inline-flex items-center gap-2 text-sm text-slate-700">
                   <input
-                    type="checkbox"
-                    checked={scheduleOptions.activeType === "RAMADAN"}
-                    onChange={(e) => e.target.checked && selectSingleSchedule("RAMADAN")}
+                    type="radio"
+                    name="activeSchedule"
+                    checked={pendingActiveType === "RAMADAN"}
+                    onChange={() => queueScheduleActivation("RAMADAN")}
+                    className="h-4 w-4 accent-blue-600"
                   />
                   <span>Ramadan</span>
                 </label>
+                {pendingActiveType !== scheduleOptions.activeType && (
+                  <button
+                    type="button"
+                    onClick={confirmScheduleActivation}
+                    disabled={scheduleSaving}
+                    className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-all disabled:opacity-60"
+                  >
+                    Confirmer
+                  </button>
+                )}
               </div>
             </div>
 
@@ -535,20 +615,30 @@ export default function ConfigurationRh() {
                   <thead className="bg-slate-100 border-b border-slate-200">
                     <tr>
                       <th className="p-3 text-left font-semibold text-slate-900" />
-                      <th className="p-3 text-left font-semibold text-slate-900">1ère séance</th>
-                      <th className="p-3 text-left font-semibold text-slate-900">2ème séance</th>
+                      <th className="p-3 text-left font-semibold text-slate-900">
+                        1ère séance
+                      </th>
+                      <th className="p-3 text-left font-semibold text-slate-900">
+                        2ème séance
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {DAYS.map((day) => {
-                      const row = scheduleRows.find((r) => r.dayOfWeek === day.idx) || {
+                      const row = scheduleRows.find(
+                        (r) => r.dayOfWeek === day.idx,
+                      ) || {
                         firstStart: "",
                         firstEnd: "",
                         secondStart: "",
                         secondEnd: "",
                       };
-                      const firstEdit = editingCell?.dayOfWeek === day.idx && editingCell?.session === 1;
-                      const secondEdit = editingCell?.dayOfWeek === day.idx && editingCell?.session === 2;
+                      const firstEdit =
+                        editingCell?.dayOfWeek === day.idx &&
+                        editingCell?.session === 1;
+                      const secondEdit =
+                        editingCell?.dayOfWeek === day.idx &&
+                        editingCell?.session === 2;
 
                       return (
                         <tr key={day.idx} className="border-t border-slate-100">
@@ -560,26 +650,42 @@ export default function ConfigurationRh() {
                                   <input
                                     type="time"
                                     value={editingTimes.start}
-                                    onChange={(e) => setEditingTimes((p) => ({ ...p, start: e.target.value }))}
+                                    onChange={(e) =>
+                                      setEditingTimes((p) => ({
+                                        ...p,
+                                        start: e.target.value,
+                                      }))
+                                    }
                                     className="rounded border border-slate-300 px-2 py-1"
                                   />
                                   <span>-</span>
                                   <input
                                     type="time"
                                     value={editingTimes.end}
-                                    onChange={(e) => setEditingTimes((p) => ({ ...p, end: e.target.value }))}
+                                    onChange={(e) =>
+                                      setEditingTimes((p) => ({
+                                        ...p,
+                                        end: e.target.value,
+                                      }))
+                                    }
                                     className="rounded border border-slate-300 px-2 py-1"
                                   />
                                 </div>
                               ) : (
                                 <span className="text-slate-600">
-                                  {row.firstStart && row.firstEnd ? `${row.firstStart} - ${row.firstEnd}` : "-"}
+                                  {row.firstStart && row.firstEnd
+                                    ? `${row.firstStart} - ${row.firstEnd}`
+                                    : "-"}
                                 </span>
                               )}
                               <button
                                 type="button"
                                 disabled={scheduleSaving}
-                                onClick={() => (firstEdit ? saveCell() : openEditCell(day.idx, 1))}
+                                onClick={() =>
+                                  firstEdit
+                                    ? saveCell()
+                                    : openEditCell(day.idx, 1)
+                                }
                                 className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-cyan-100 text-cyan-700 hover:bg-cyan-200"
                               >
                                 {firstEdit ? "✓" : "✎"}
@@ -593,26 +699,42 @@ export default function ConfigurationRh() {
                                   <input
                                     type="time"
                                     value={editingTimes.start}
-                                    onChange={(e) => setEditingTimes((p) => ({ ...p, start: e.target.value }))}
+                                    onChange={(e) =>
+                                      setEditingTimes((p) => ({
+                                        ...p,
+                                        start: e.target.value,
+                                      }))
+                                    }
                                     className="rounded border border-slate-300 px-2 py-1"
                                   />
                                   <span>-</span>
                                   <input
                                     type="time"
                                     value={editingTimes.end}
-                                    onChange={(e) => setEditingTimes((p) => ({ ...p, end: e.target.value }))}
+                                    onChange={(e) =>
+                                      setEditingTimes((p) => ({
+                                        ...p,
+                                        end: e.target.value,
+                                      }))
+                                    }
                                     className="rounded border border-slate-300 px-2 py-1"
                                   />
                                 </div>
                               ) : (
                                 <span className="text-slate-600">
-                                  {row.secondStart && row.secondEnd ? `${row.secondStart} - ${row.secondEnd}` : "-"}
+                                  {row.secondStart && row.secondEnd
+                                    ? `${row.secondStart} - ${row.secondEnd}`
+                                    : "-"}
                                 </span>
                               )}
                               <button
                                 type="button"
                                 disabled={scheduleSaving}
-                                onClick={() => (secondEdit ? saveCell() : openEditCell(day.idx, 2))}
+                                onClick={() =>
+                                  secondEdit
+                                    ? saveCell()
+                                    : openEditCell(day.idx, 2)
+                                }
                                 className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-cyan-100 text-cyan-700 hover:bg-cyan-200"
                               >
                                 {secondEdit ? "✓" : "✎"}

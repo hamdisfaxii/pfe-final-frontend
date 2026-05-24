@@ -1,22 +1,16 @@
 import React from "react";
-import { isFranceSortieCourteEligible } from "../../utils/country";
+import { isFranceSortieCourteEligible, normalizeCountryIsoForHr } from "../../utils/country";
 
 function formatRttFranceJours(val) {
   if (val == null || !Number.isFinite(Number(val))) return "—";
   const n = Number(val);
-  // Si c'est un entier (ex: 7), afficher sans décimales
-  if (Math.abs(n - Math.round(n)) < 1e-6) {
-    return String(Math.round(n));
-  }
-  // Pour les décimales, afficher avec virgule française (ex: 7,5 ou 7,25)
-  return n.toLocaleString("fr-FR", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 2,
-  });
+  if (Math.abs(n - Math.round(n)) < 1e-6) return String(Math.round(n));
+  return n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
 }
 
 export default function SoldeConge({ soldeSummary, solde, employeeCountry }) {
   const showFranceSortieCourte = isFranceSortieCourteEligible(employeeCountry);
+  const showMaladie = !["FR", "MA"].includes(normalizeCountryIsoForHr(employeeCountry));
 
   if (soldeSummary) {
     const { congesPayes, permission, maladie, franceRtt } = soldeSummary;
@@ -79,28 +73,13 @@ export default function SoldeConge({ soldeSummary, solde, employeeCountry }) {
                 <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
                   RTT (France)
                 </div>
-                {franceRtt.contractSuspended ? (
-                  <p className="text-sm text-slate-600">Contrat suspendu</p>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-3 gap-2 text-center sm:text-left sm:grid-cols-1">
+                <div className="grid grid-cols-2 gap-2 text-center sm:text-left sm:grid-cols-1">
                       <div>
                         <div className="text-[10px] font-semibold text-slate-400 uppercase">
                           Total
                         </div>
                         <div className="text-lg font-bold text-slate-900">
                           {formatRttFranceJours(franceRtt.total)}{" "}
-                          <span className="text-sm font-semibold text-slate-600">
-                            j
-                          </span>
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-[10px] font-semibold text-slate-400 uppercase">
-                          Pris
-                        </div>
-                        <div className="text-lg font-bold text-slate-900">
-                          {formatRttFranceJours(franceRtt.used)}{" "}
                           <span className="text-sm font-semibold text-slate-600">
                             j
                           </span>
@@ -118,8 +97,6 @@ export default function SoldeConge({ soldeSummary, solde, employeeCountry }) {
                         </div>
                       </div>
                     </div>
-                  </>
-                )}
               </div>
             ) : (
               bloc(
@@ -137,7 +114,7 @@ export default function SoldeConge({ soldeSummary, solde, employeeCountry }) {
               "border-amber-600",
             )
           ) : null}
-          {bloc("Congé maladie", joursMal, null, "border-teal-600")}
+          {showMaladie && bloc("Congé maladie", joursMal, null, "border-teal-600")}
         </div>
       </div>
     );

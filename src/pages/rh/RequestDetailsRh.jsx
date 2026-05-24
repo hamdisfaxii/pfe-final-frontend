@@ -5,22 +5,36 @@ import Spinner from "../../components/commun/Spinner";
 import StatutBadge from "../../components/employee/StatutBadge";
 import { libelleAffichageTypeConge } from "../../utils/country";
 
-/**
- * Formate les nombres décimaux avec virgule française (ex: 7,5 pour 7.5)
- * Affiche les entiers sans décimales (ex: 7 au lieu de 7,00)
- */
 const formatDecimalFr = (val) => {
   if (val == null || !Number.isFinite(Number(val))) return "—";
   const n = Number(val);
-  // Si c'est un entier, afficher sans décimales
-  if (Math.abs(n - Math.round(n)) < 1e-6) {
-    return String(Math.round(n));
-  }
-  // Pour les décimales, afficher avec virgule française
-  return n.toLocaleString("fr-FR", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 2,
-  });
+  if (Math.abs(n - Math.round(n)) < 1e-6) return String(Math.round(n));
+  return n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+};
+
+const formatDateFr = (raw) => {
+  if (!raw) return "-";
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return String(raw);
+  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+};
+
+const formatTimeLabel = (time) => {
+  if (!time) return "";
+  if (String(time).toUpperCase() === "MORNING") return "Matin";
+  if (String(time).toUpperCase() === "AFTERNOON") return "Après-midi";
+  return time;
+};
+
+const formatRequestPeriod = (request) => {
+  if (!request) return "-";
+  const startDate = formatDateFr(request.dateDebut);
+  const endDate = formatDateFr(request.dateFin);
+  const startTime = formatTimeLabel(request.heureDebut || request.startHalfDay);
+  const endTime = formatTimeLabel(request.heureFin || request.endHalfDay);
+  const startPart = startTime ? `${startDate} ${startTime}` : startDate;
+  const endPart = endTime ? `${endDate} ${endTime}` : endDate;
+  return `${startPart} → ${endPart}`;
 };
 
 export default function RequestDetailsRh() {
@@ -28,6 +42,7 @@ export default function RequestDetailsRh() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [commentError, setCommentError] = useState("");
   const [request, setRequest] = useState(null);
   const [comment, setComment] = useState("");
 
@@ -48,6 +63,11 @@ export default function RequestDetailsRh() {
   }, [load]);
 
   const decide = async (action) => {
+    if (action === "REJECT" && !comment.trim()) {
+      setCommentError("Le motif de rejet est obligatoire.");
+      return;
+    }
+    setCommentError("");
     setLoading(true);
     setError("");
     try {
@@ -96,7 +116,22 @@ export default function RequestDetailsRh() {
                     Employé
                   </div>
                   <div className="text-sm text-slate-900">
-                    {request.employe?.prenom} {request.employe?.nom}
+                    {request.employe?.prenom ||
+                      request.employe?.firstName ||
+                      request.prenom ||
+                      request.firstName ||
+                      ""}{" "}
+                    {request.employe?.nom ||
+                      request.employe?.lastName ||
+                      request.nom ||
+                      request.lastName ||
+                      ""}
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    {request.employe?.email ||
+                      request.employe?.mail ||
+                      request.email ||
+                      "-"}
                   </div>
                 </div>
                 <div>
@@ -107,8 +142,11 @@ export default function RequestDetailsRh() {
                     {(() => {
                       const ap =
                         request?.approuvePar ?? request?.approvedBy ?? null;
-                      const nm = `${ap?.prenom ?? ""} ${ap?.nom ?? ""}`.trim();
-                      return nm || ap?.email || "-";
+                      if (!ap) return "-";
+                      if (typeof ap === "string") return ap;
+                      const nm =
+                        `${ap?.prenom ?? ap?.firstName ?? ""} ${ap?.nom ?? ap?.lastName ?? ""}`.trim();
+                      return nm || ap?.email || ap?.mail || "-";
                     })()}
                   </div>
                 </div>
@@ -118,6 +156,16 @@ export default function RequestDetailsRh() {
                   </div>
                   <div className="text-sm text-slate-900">
                     <StatutBadge statut={request.statut} />
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold uppercase text-slate-500">
+                    Pays / Département
+                  </div>
+                  <div className="text-sm text-slate-900">
+                    {(request.employe?.country || "-") +
+                      " / " +
+                      (request.employe?.department || "-")}
                   </div>
                 </div>
                 <div>
@@ -133,7 +181,7 @@ export default function RequestDetailsRh() {
                     Période
                   </div>
                   <div className="text-sm text-slate-900">
-                    {request.dateDebut} → {request.dateFin}
+                    {formatRequestPeriod(request)}
                   </div>
                 </div>
                 <div>
@@ -173,26 +221,60 @@ export default function RequestDetailsRh() {
                     })()}
                   </div>
                 </div>
+                <div>
+                  <div className="text-xs font-semibold uppercase text-slate-500">
+                    Date de soumission
+                  </div>
+                  <div className="text-sm text-slate-900">
+                    {formatDateFr(request.dateSoumission || request.createdAt)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold uppercase text-slate-500">
+                    Date d'acceptation
+                  </div>
+                  <div className="text-sm text-slate-900">
+                    {formatDateFr(request.dateDecision || request.dateAcceptation || request.updatedAt)}
+                  </div>
+                </div>
                 <div className="sm:col-span-2">
                   <div className="text-xs font-semibold uppercase text-slate-500">
-                    Motif
+                    Motif / Commentaire employé
                   </div>
                   <div className="text-sm text-slate-900">
                     {request.motif || "-"}
                   </div>
                 </div>
+                {request.commentaireRh ? (
+                  <div className="sm:col-span-2">
+                    <div className="text-xs font-semibold uppercase text-slate-500">
+                      Commentaire RH
+                    </div>
+                    <div className="text-sm text-slate-900">
+                      {request.commentaireRh}
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
               <div className="mt-6">
                 <label className="text-sm font-semibold text-slate-700">
-                  Commentaire
+                  Commentaire{" "}
+                  <span className="text-xs font-normal text-slate-500">
+                    (obligatoire en cas de rejet <span className="text-red-500">*</span>)
+                  </span>
                 </label>
                 <textarea
                   value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  className="mt-2 min-h-[100px] w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Commentaire de validation/rejet"
+                  onChange={(e) => { setComment(e.target.value); setCommentError(""); }}
+                  className={`mt-2 min-h-[100px] w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    commentError ? "border-red-400 bg-red-50" : "border-slate-200"
+                  }`}
+                  placeholder="Commentaire de validation / motif de rejet"
                 />
+                {commentError && (
+                  <p className="mt-1 text-xs font-medium text-red-600">{commentError}</p>
+                )}
               </div>
 
               <div className="mt-6 flex gap-3">

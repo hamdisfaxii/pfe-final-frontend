@@ -47,8 +47,9 @@ export default function FiltresDemandes({
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 fade-in-up">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div className="flex flex-col gap-2 w-full md:w-56">
-          <label className="text-sm font-semibold text-slate-700">Année</label>
+          <label htmlFor="filtres-annee" className="text-sm font-semibold text-slate-700">Année</label>
           <select
+            id="filtres-annee"
             value={annee}
             onChange={(e) => setAnnee(e.target.value)}
             className="border border-slate-200 rounded-lg px-4 py-2.5 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -62,8 +63,9 @@ export default function FiltresDemandes({
         </div>
 
         <div className="flex flex-col gap-2 w-full md:w-56">
-          <label className="text-sm font-semibold text-slate-700">État</label>
+          <label htmlFor="filtres-statut" className="text-sm font-semibold text-slate-700">État</label>
           <select
+            id="filtres-statut"
             value={statut}
             onChange={(e) => setStatut(e.target.value)}
             className="border border-slate-200 rounded-lg px-4 py-2.5 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -71,8 +73,8 @@ export default function FiltresDemandes({
             <option value="tous">tous</option>
             <option value="attente">attente</option>
             <option value="validee">accordée</option>
-            <option value="refusée">refusée</option>
-            <option value="annulée">annulée</option>
+            <option value="refusee">refusée</option>
+            <option value="annulee">annulée</option>
           </select>
         </div>
 

@@ -1,34 +1,64 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import api from "../../utils/api";
 import Spinner from "../../components/commun/Spinner";
+import { normalizeCountryIsoForHr } from "../../utils/country";
 
 const clamp = (n, min, max) => Math.min(Math.max(n, min), max);
 
-/**
- * Formate les nombres décimaux avec virgule française (ex: 7,5 pour 7.5)
- * Affiche les entiers sans décimales (ex: 7 au lieu de 7,00)
- */
 const formatDecimalFr = (val) => {
   if (val == null || !Number.isFinite(Number(val))) return "—";
   const n = Number(val);
-  // Si c'est un entier, afficher sans décimales
-  if (Math.abs(n - Math.round(n)) < 1e-6) {
-    return String(Math.round(n));
-  }
-  // Pour les décimales, afficher avec virgule française
-  return n.toLocaleString("fr-FR", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 2,
-  });
+  if (Math.abs(n - Math.round(n)) < 1e-6) return String(Math.round(n));
+  return n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
 };
 
-/** Ordre des colonnes de soldes comme maquette métier / Dolibarr. */
-const SOLDES_COLUMN_ORDER = [
-  { typeConge: "MALADIE", header: "Congé maladie" },
-  { typeConge: "SANS_SOLDE", header: "Autre congé" },
-  { typeConge: "PAYE", header: "Congés payés" },
-  { typeConge: "COURTE_DUREE", header: "RTT" },
+const SKIPPED_SOLDE_TYPES = new Set([
+  "PARENTAL",
+  "ENFANT_MALADE",
+  "ARRIVE_AUTORISATION",
+  "SANS_SOLDE",
+  "CONGE_SANS_SOLDE",
+]);
+
+const SOLDE_TYPE_LABELS = {
+  CONGES_PAYES: "Congés payés",
+  MALADIE: "Congé maladie",
+  COURTE_DUREE: "RTT (France)",
+  SORTIE_COURTE: "RTT (France)",
+  SANS_SOLDE: "Autre congé",
+  CONGE_SANS_SOLDE: "Autre congé",
+};
+
+const SOLDE_TYPE_DISPLAY_ORDER = [
+  "MALADIE",
+  "CONGES_PAYES",
+  "COURTE_DUREE",
+  "SORTIE_COURTE",
 ];
+
+const getTypeLabel = (typeConge) => {
+  const key = normalizeTypeKey(typeConge);
+  return (
+    SOLDE_TYPE_LABELS[key] ||
+    String(key)
+      .toLowerCase()
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+  );
+};
+
+const getSortedSoldeTypeKeys = (keys) => {
+  return [...keys]
+    .filter((type) => !SKIPPED_SOLDE_TYPES.has(type))
+    .sort((a, b) => {
+      const idxA = SOLDE_TYPE_DISPLAY_ORDER.indexOf(a);
+      const idxB = SOLDE_TYPE_DISPLAY_ORDER.indexOf(b);
+      if (idxA !== -1 || idxB !== -1) {
+        return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+      }
+      return String(a).localeCompare(String(b));
+    });
+};
 
 const PersonGlyph = ({ className = "w-4 h-4 text-slate-400" }) => (
   <svg
@@ -48,23 +78,12 @@ const formatUser = (u) => {
   return full || u?.email || "Utilisateur";
 };
 
-const supervisorLabel = (user) => {
-  const d = String(user?.departement ?? "").trim();
-  if (d) return d;
-  return "DRH";
-};
-
 const normalizeTypeKey = (t) => String(t ?? "").toUpperCase();
 
 const findBalanceLine = (row, typeConge) => {
   const lines = Array.isArray(row?.balances) ? row.balances : [];
   const wanted = normalizeTypeKey(typeConge);
   return lines.find((l) => normalizeTypeKey(l?.typeConge) === wanted) ?? null;
-};
-
-const isMockSession = () => {
-  const token = localStorage.getItem("token") || "";
-  return token.startsWith("token_");
 };
 
 export default function SoldesRh() {
@@ -91,7 +110,6 @@ export default function SoldesRh() {
   const [selectedRows, setSelectedRows] = useState(() => new Set());
 
   const load = useCallback(async () => {
-
     setLoading(true);
     setError("");
     setSuccess("");
@@ -121,7 +139,7 @@ export default function SoldesRh() {
     load();
   }, [load]);
 
-  const items = Array.isArray(data?.items) ? data.items : [];
+  const items = useMemo(() => Array.isArray(data?.items) ? data.items : [], [data]);
   const totalPages = Number.isFinite(data?.totalPages) ? data.totalPages : 0;
 
   const noteKeyForRow = (row) => `${row?.user?.id}:${row?.year ?? currentYear}`;
@@ -129,24 +147,38 @@ export default function SoldesRh() {
   const onChangeRemaining = (row, typeConge, value) => {
     setError("");
     setSuccess("");
+    // N'autoriser que des chiffres avec un séparateur décimal optionnel
+    // (virgule ou point) ou un champ vide. On conserve la saisie brute pour
+    // que l'utilisateur puisse effacer puis ressaisir librement.
+    if (value !== "" && !/^\d*[.,]?\d*$/.test(value)) return;
     const key = `${row?.user?.id}:${row?.year}:${typeConge}`;
-    // Normaliser la virgule française (7,5) en point (7.5) pour JavaScript
-    const normalizedValue = value.replace(",", ".");
-    const n = normalizedValue === "" ? NaN : Number(normalizedValue);
-    if (normalizedValue !== "" && !Number.isFinite(n)) return;
-    if (Number.isFinite(n) && n < 0) return;
     setDraft((prev) => {
       const next = new Map(prev);
-      if (normalizedValue === "") next.set(key, "");
-      else next.set(key, n);
+      next.set(key, value);
       return next;
     });
   };
 
-  const currentRemaining = (row, line, typeConge) => {
+  const allTypeKeys = useMemo(() => {
+    const keys = new Set();
+    items.forEach((row) => {
+      const lines = Array.isArray(row?.balances) ? row.balances : [];
+      lines.forEach((line) => {
+        const typeKey = normalizeTypeKey(line?.typeConge);
+        if (typeKey) keys.add(typeKey);
+      });
+    });
+    return getSortedSoldeTypeKeys(Array.from(keys));
+  }, [items]);
+
+  const cellInputValue = (row, line, typeConge, rttNotApplicable) => {
     const key = `${row?.user?.id}:${row?.year}:${typeConge}`;
+    // Pendant la saisie : afficher exactement ce que l'utilisateur a tapé.
     if (draft.has(key)) return draft.get(key);
-    return line?.remaining ?? 0;
+    // Cellule non applicable ou sans ligne : tiret (champ désactivé).
+    if (rttNotApplicable || line == null) return "—";
+    // Sinon : valeur serveur formatée fr-FR.
+    return formatDecimalFr(line?.remaining);
   };
 
   const buildPayloadForRow = (row) => {
@@ -154,14 +186,15 @@ export default function SoldesRh() {
     const year = row?.year;
     if (userId == null || year == null) return null;
     const updates = [];
-    for (const col of SOLDES_COLUMN_ORDER) {
-      const k = `${userId}:${year}:${col.typeConge}`;
+    for (const typeConge of allTypeKeys) {
+      const k = `${userId}:${year}:${typeConge}`;
       if (!draft.has(k)) continue;
-      const v = draft.get(k);
-      if (v === "" || v == null) continue;
-      const remaining = Number(v);
+      const raw = draft.get(k);
+      if (raw === "" || raw == null) continue;
+      // Saisie brute : normaliser la virgule fr (7,5 → 7.5) avant de parser.
+      const remaining = Number(String(raw).replace(",", "."));
       if (!Number.isFinite(remaining) || remaining < 0) continue;
-      updates.push({ typeConge: col.typeConge, remaining });
+      updates.push({ typeConge, remaining });
     }
     if (updates.length === 0) return null;
     return [{ userId, year, updates }];
@@ -351,18 +384,14 @@ export default function SoldesRh() {
                       />
                     </th>
                     <th className="px-3 py-2.5 min-w-[160px]">Collaborateur</th>
-                    <th className="px-3 py-2.5 min-w-[100px]">Superviseur</th>
-                    {SOLDES_COLUMN_ORDER.map((col) => (
+                    {allTypeKeys.map((typeConge) => (
                       <th
-                        key={col.typeConge}
+                        key={typeConge}
                         className="px-2 py-2.5 whitespace-nowrap"
                       >
-                        {col.header}
+                        {getTypeLabel(typeConge)}
                       </th>
                     ))}
-                    <th className="px-2 py-2.5 whitespace-nowrap">
-                      Récupération
-                    </th>
                     <th
                       className="px-3 py-2.5 min-w-[140px]"
                       title="Brouillon local — non enregistré sur le serveur"
@@ -376,7 +405,7 @@ export default function SoldesRh() {
                   {items.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={3 + SOLDES_COLUMN_ORDER.length + 3}
+                        colSpan={2 + allTypeKeys.length + 2}
                         className="px-3 py-12 text-center text-sm text-slate-500"
                       >
                         Aucun résultat.
@@ -413,64 +442,39 @@ export default function SoldesRh() {
                               </div>
                             </div>
                           </td>
-                          <td className="px-3 py-2.5 align-middle">
-                            <div className="flex items-center gap-2">
-                              <PersonGlyph />
-                              <span className="text-sm text-slate-700">
-                                {supervisorLabel(row?.user)}
-                              </span>
-                            </div>
-                          </td>
-                          {SOLDES_COLUMN_ORDER.map((col) => {
-                            const line = findBalanceLine(row, col.typeConge);
-                            const ro = Boolean(line?.readOnly) || line == null;
-                            const displayVal = currentRemaining(
-                              row,
-                              line,
-                              col.typeConge,
-                            );
+                          {allTypeKeys.map((typeConge) => {
+                            const line = findBalanceLine(row, typeConge);
+                            const empCountry = normalizeCountryIsoForHr(row?.user?.pays);
+                            const rttNotApplicable =
+                              (typeConge === "COURTE_DUREE" || typeConge === "SORTIE_COURTE") && empCountry !== "FR";
+                            const ro = rttNotApplicable || Boolean(line?.readOnly) || line == null;
                             return (
                               <td
-                                key={col.typeConge}
+                                key={typeConge}
                                 className="px-2 py-2 align-middle"
                               >
                                 <input
                                   type="text"
                                   inputMode="decimal"
-                                  value={
-                                    displayVal === ""
-                                      ? ""
-                                      : formatDecimalFr(displayVal)
-                                  }
+                                  value={cellInputValue(
+                                    row,
+                                    line,
+                                    typeConge,
+                                    rttNotApplicable,
+                                  )}
                                   disabled={ro || saving}
-                                  title={line?.message || undefined}
                                   onChange={(e) =>
                                     onChangeRemaining(
                                       row,
-                                      col.typeConge,
+                                      typeConge,
                                       e.target.value,
                                     )
                                   }
                                   className={inputCls(ro)}
                                 />
-                                {line?.message ? (
-                                  <p className="mt-0.5 text-[10px] text-amber-600 leading-tight max-w-[7rem]">
-                                    {line.message}
-                                  </p>
-                                ) : null}
                               </td>
                             );
                           })}
-                          <td className="px-2 py-2 align-middle">
-                            <input
-                              type="text"
-                              disabled
-                              value="—"
-                              readOnly
-                              className={inputCls(true)}
-                              title="Type non mappé dans l’application (réservé évolution)"
-                            />
-                          </td>
                           <td className="px-3 py-2 align-middle">
                             <textarea
                               rows={2}

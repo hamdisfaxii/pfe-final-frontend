@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { useAuth } from "../context/authcontext";
 import { useNavigate } from "react-router-dom";
 
-/** Corps JSON Spring, mock Node, etc. */
 function readApiErrorPayload(err) {
   const d = err?.response?.data;
   if (d == null) return { code: null, text: null, detail: null };
@@ -33,24 +32,32 @@ function getLoginErrorMessage(err) {
   }
 
   if (err?.code === "ECONNABORTED") {
-    return ["Délai d’attente dépassé", "Le serveur ne répond pas assez vite. Réessayez."].join("\n");
+    return [
+      "Délai d’attente dépassé",
+      "Le serveur ne répond pas assez vite. Réessayez.",
+    ].join("\n");
   }
 
   if (status === 400 && code === "MISSING_CREDENTIALS") {
-    return ["Champs incomplets", text || "Saisissez votre email et votre mot de passe."].join("\n");
+    return [
+      "Champs incomplets",
+      text || "Saisissez votre email et votre mot de passe.",
+    ].join("\n");
   }
 
   if (status === 401) {
     if (code === "USER_NOT_FOUND") {
       return [
-        "Compte inconnu",
-        text || "Aucun utilisateur n’est enregistré avec cet email. Vérifiez l’orthographe ou contactez le RH.",
+        "Compte introuvable",
+        text ||
+          "Aucun employé ne correspond à cet email. Vérifiez votre identifiant ou contactez le RH.",
       ].join("\n");
     }
     if (code === "INVALID_PASSWORD") {
       return [
         "Mot de passe incorrect",
-        text || "Le mot de passe ne correspond pas au compte. Vérifiez les majuscules / minuscules.",
+        text ||
+          "Le mot de passe ne correspond pas au compte. Vérifiez les majuscules / minuscules.",
       ].join("\n");
     }
     const low = String(text || "").toLowerCase();
@@ -60,21 +67,48 @@ function getLoginErrorMessage(err) {
         text || "Aucun utilisateur avec cet email.",
       ].join("\n");
     }
-    if (low.includes("mot de passe") || low.includes("password") || low.includes("identifiants")) {
-      return ["Connexion refusée", text || "Email ou mot de passe incorrect."].join("\n");
+    if (
+      low.includes("employé") ||
+      low.includes("employe") ||
+      low.includes("introuvable") ||
+      low.includes("inexistant") ||
+      low.includes("aucun employé")
+    ) {
+      return [
+        "Compte introuvable",
+        text || "L’utilisateur n’existe pas dans Dolibarr.",
+      ].join("\n");
     }
-    return ["Connexion refusée (401)", text || "Identifiants refusés par le serveur."].join("\n");
+    if (
+      low.includes("mot de passe") ||
+      low.includes("password") ||
+      low.includes("identifiants")
+    ) {
+      return [
+        "Connexion refusée",
+        text || "Email ou mot de passe incorrect.",
+      ].join("\n");
+    }
+    return [
+      "Connexion refusée (401)",
+      text || "Identifiants refusés par le serveur.",
+    ].join("\n");
   }
 
   if (status === 403) {
-    return ["Accès refusé", text || "Vous n’avez pas la permission de vous connecter ici."].join("\n");
+    return [
+      "Accès refusé",
+      text || "Vous n’avez pas la permission de vous connecter ici.",
+    ].join("\n");
   }
 
   if (status >= 500) {
     const extra = detail ? `\n${detail}` : "";
     return [
       `Erreur serveur (${status})`,
-      (text || "Une erreur technique s’est produite. Réessayez dans quelques instants.") + extra,
+      (text ||
+        "Une erreur technique s’est produite. Réessayez dans quelques instants.") +
+        extra,
     ].join("\n");
   }
 
@@ -97,7 +131,7 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const { login, getHomePath } = useAuth(); // 🔥 utilisation du context
+  const { login, getHomePath } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -106,7 +140,7 @@ function Login() {
     setError("");
 
     try {
-      const responseData = await login(email.trim(), password); // 🔥 appel du context
+      const responseData = await login(email.trim(), password);
       navigate(getHomePath(responseData?.role));
     } catch (err) {
       setError(getLoginErrorMessage(err));
@@ -138,7 +172,9 @@ function Login() {
                     {i === 0 ? (
                       <span className="font-semibold text-red-800">{line}</span>
                     ) : (
-                      <span className="font-normal text-red-700 mt-1 block">{line}</span>
+                      <span className="font-normal text-red-700 mt-1 block">
+                        {line}
+                      </span>
                     )}
                   </span>
                 ))}
@@ -148,12 +184,13 @@ function Login() {
 
           <form className="space-y-5" onSubmit={handleSubmit}>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Email
+              <label htmlFor="login-email" className="block text-sm font-semibold text-slate-700 mb-2">
+                Identifiant / Email
               </label>
               <input
-                type="email"
-                placeholder="votre@email.com"
+                id="login-email"
+                type="text"
+                placeholder="Identifiant ou adresse email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -165,10 +202,11 @@ function Login() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
+              <label htmlFor="login-password" className="block text-sm font-semibold text-slate-700 mb-2">
                 Mot de passe
               </label>
               <input
+                id="login-password"
                 type="password"
                 placeholder="••••••••"
                 value={password}
