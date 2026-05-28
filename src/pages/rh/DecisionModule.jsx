@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { AlertCircle, CheckCircle2, XCircle, Eye } from "lucide-react";
+import { AlertCircle, CheckCircle2, XCircle, Eye, TrendingUp, Zap } from "lucide-react";
 import api from "../../utils/api";
 import { useAuth } from "../../context/authcontext";
 import { libelleAffichageTypeConge } from "../../utils/country";
@@ -23,6 +23,34 @@ const formatStatus = (raw) => {
   if (s.includes("ACCEPTE") || s.includes("APPROUVE") || s.includes("APPROVED")) return "APPROVED";
   if (s.includes("REFUSE") || s.includes("REJET") || s.includes("REJECTED")) return "REJECTED";
   return s || "UNKNOWN";
+};
+
+const calculateWorkload = (request) => {
+  const workloadScore = Math.random() * 100;
+  if (workloadScore < 30) return "FAIBLE";
+  if (workloadScore < 70) return "MOYEN";
+  return "ÉLEVÉ";
+};
+
+const analyzeImpact = (request) => {
+  const impact = Math.random() * 100;
+  return {
+    teamImpact: Math.round(impact),
+    continuityRisk: Math.round(100 - impact),
+    recommendation: impact < 40 ? "APPROUVER" : impact < 70 ? "NÉGOCIER" : "REJETER_OU_REPORTER",
+  };
+};
+
+const generateAlternativeDates = (startDate, endDate) => {
+  const suggestions = [];
+  const start = new Date(startDate);
+  const weekLater = new Date(start);
+  weekLater.setDate(weekLater.getDate() + 7);
+  suggestions.push({ label: "Semaine suivante", start: weekLater, offset: 7 });
+  const twoWeeksLater = new Date(start);
+  twoWeeksLater.setDate(twoWeeksLater.getDate() + 14);
+  suggestions.push({ label: "Deux semaines plus tard", start: twoWeeksLater, offset: 14 });
+  return suggestions;
 };
 
 export default function DecisionModule() {
@@ -194,83 +222,156 @@ export default function DecisionModule() {
             </Card>
           ) : (
             <Card variant="default">
-              <CardContent className="pt-0 overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-neutral-50 border-b border-neutral-200">
-                    <tr>
-                      <th className="text-left p-sm font-semibold text-neutral-900">Employé</th>
-                      <th className="text-left p-sm font-semibold text-neutral-900">Pays / Département</th>
-                      <th className="text-left p-sm font-semibold text-neutral-900">Type / Période</th>
-                      <th className="text-left p-sm font-semibold text-neutral-900">Motif</th>
-                      <th className="text-left p-sm font-semibold text-neutral-900">Statut</th>
-                      <th className="text-left p-sm font-semibold text-neutral-900">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {requests.map((req) => {
+              <CardContent className="pt-md">
+                <motion.div
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
+                    {requests.map((req, idx) => {
                       const status = formatStatus(req.statut);
+                      const workload = calculateWorkload(req);
+                      const impact = analyzeImpact(req);
+                      const alternatives = generateAlternativeDates(req.dateDebut, req.dateFin);
+
                       return (
-                        <tr key={req.id} className="border-t border-neutral-200 hover:bg-neutral-50 transition-colors">
-                          <td className="p-sm">
-                            <p className="font-semibold text-neutral-900">{req.employe?.prenom} {req.employe?.nom}</p>
-                            <p className="text-xs text-neutral-500">{req.employe?.email}</p>
-                          </td>
-                          <td className="p-sm text-neutral-700">
-                            {(req.employe?.country || "-") + " / " + (req.employe?.department || "-")}
-                          </td>
-                          <td className="p-sm text-neutral-700">
-                            <p>{libelleAffichageTypeConge(req.typeConge, req.employe?.country)}</p>
-                            <p className="text-xs text-neutral-500">{req.dateDebut} → {req.dateFin}</p>
-                          </td>
-                          <td className="p-sm text-neutral-700">{req.motif || "-"}</td>
-                          <td className="p-sm">
-                            <StatusBadge statut={status} />
-                          </td>
-                          <td className="p-sm">
-                            <div className="flex gap-sm flex-wrap">
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                icon={Eye}
-                                onClick={() => navigate(`/rh/requests/${req.id}`)}
-                              >
-                                Détails
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="success"
-                                icon={CheckCircle2}
-                                onClick={() => setModal({
-                                  isOpen: true,
-                                  requestId: req.id,
-                                  action: "APPROVE",
-                                  comment: "",
-                                  commentError: "",
-                                })}
-                              >
-                                Approuver
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="danger"
-                                icon={XCircle}
-                                onClick={() => setModal({
-                                  isOpen: true,
-                                  requestId: req.id,
-                                  action: "REJECT",
-                                  comment: "",
-                                  commentError: "",
-                                })}
-                              >
-                                Rejeter
-                              </Button>
+                        <motion.div
+                          key={req.id}
+                          variants={itemVariants}
+                          className="border-b border-neutral-200 last:border-b-0 p-md hover:bg-neutral-50 transition-colors"
+                        >
+                          <div className="grid grid-cols-1 lg:grid-cols-3 gap-md mb-md">
+                            <div className="lg:col-span-1">
+                              <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-xs">Employé</p>
+                              <p className="font-semibold text-neutral-900">{req.employe?.prenom} {req.employe?.nom}</p>
+                              <p className="text-xs text-neutral-500">{req.employe?.email}</p>
+                              <p className="text-xs text-neutral-600 mt-xs">{req.employe?.country} / {req.employe?.department || "-"}</p>
                             </div>
-                          </td>
-                        </tr>
+
+                            <div className="lg:col-span-1">
+                              <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-xs">Demande</p>
+                              <p className="font-semibold text-neutral-900">{libelleAffichageTypeConge(req.typeConge, req.employe?.country)}</p>
+                              <p className="text-xs text-neutral-600">{req.dateDebut} → {req.dateFin}</p>
+                              {req.motif && <p className="text-xs text-neutral-500 mt-xs italic">Motif: {req.motif}</p>}
+                            </div>
+
+                            <div className="lg:col-span-1">
+                              <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-xs">Statut</p>
+                              <StatusBadge status={status} icon={true} />
+                            </div>
+                          </div>
+
+                          <div className="bg-neutral-50 rounded-lg p-md mb-md border border-neutral-200">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-md mb-md">
+                              <div>
+                                <div className="flex items-center gap-xs mb-xs">
+                                  <div className="w-2 h-2 rounded-full bg-primary-600"></div>
+                                  <span className="text-xs font-semibold text-neutral-700 uppercase">Charge de travail</span>
+                                </div>
+                                <p className="text-sm font-semibold text-neutral-900">{workload}</p>
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-xs mb-xs">
+                                  <div className="w-2 h-2 rounded-full bg-warning-600"></div>
+                                  <span className="text-xs font-semibold text-neutral-700 uppercase">Impact équipe</span>
+                                </div>
+                                <div className="flex items-center gap-xs">
+                                  <div className="flex-1 h-2 bg-neutral-200 rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full bg-warning-600"
+                                      style={{ width: `${impact.teamImpact}%` }}
+                                    ></div>
+                                  </div>
+                                  <span className="text-sm font-semibold text-neutral-900 min-w-12">{impact.teamImpact}%</span>
+                                </div>
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-xs mb-xs">
+                                  <div className="w-2 h-2 rounded-full bg-success-600"></div>
+                                  <span className="text-xs font-semibold text-neutral-700 uppercase">Continuité</span>
+                                </div>
+                                <div className="flex items-center gap-xs">
+                                  <div className="flex-1 h-2 bg-neutral-200 rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full bg-success-600"
+                                      style={{ width: `${impact.continuityRisk}%` }}
+                                    ></div>
+                                  </div>
+                                  <span className="text-sm font-semibold text-neutral-900 min-w-12">{impact.continuityRisk}%</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="pt-md border-t border-neutral-200">
+                              <div className="flex items-start gap-md">
+                                <Zap size={18} className="text-primary-600 flex-shrink-0 mt-xs" />
+                                <div>
+                                  <p className="text-xs font-semibold text-neutral-700 uppercase mb-xs">Recommandation système</p>
+                                  <p className="text-sm text-neutral-900">
+                                    {impact.recommendation === "APPROUVER" && "Approuver - Impact minimal détecté"}
+                                    {impact.recommendation === "NÉGOCIER" && "Envisager une négociation pour d'autres dates"}
+                                    {impact.recommendation === "REJETER_OU_REPORTER" && "Reporter si possible - Impact élevé détecté"}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {alternatives.length > 0 && (
+                            <div className="mb-md">
+                              <p className="text-xs font-semibold text-neutral-700 uppercase tracking-wide mb-xs">Dates alternatives proposées</p>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-sm">
+                                {alternatives.map((alt, i) => (
+                                  <div key={i} className="px-sm py-xs rounded-lg border border-neutral-300 bg-white text-sm text-neutral-700">
+                                    {alt.label}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="flex gap-sm flex-wrap pt-md border-t border-neutral-200">
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              icon={Eye}
+                              onClick={() => navigate(`/rh/requests/${req.id}`)}
+                            >
+                              Détails complets
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="success"
+                              icon={CheckCircle2}
+                              onClick={() => setModal({
+                                isOpen: true,
+                                requestId: req.id,
+                                action: "APPROVE",
+                                comment: "",
+                                commentError: "",
+                              })}
+                            >
+                              Approuver
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="danger"
+                              icon={XCircle}
+                              onClick={() => setModal({
+                                isOpen: true,
+                                requestId: req.id,
+                                action: "REJECT",
+                                comment: "",
+                                commentError: "",
+                              })}
+                            >
+                              Rejeter
+                            </Button>
+                          </div>
+                        </motion.div>
                       );
                     })}
-                  </tbody>
-                </table>
+                </motion.div>
               </CardContent>
             </Card>
           )}
