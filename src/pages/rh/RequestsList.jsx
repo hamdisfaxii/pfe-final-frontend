@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { AlertCircle, Download, Search, Filter } from "lucide-react";
+import { AlertCircle, Download, Search, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { getHrRequests } from "../../utils/rhApi";
 import { downloadHistoriqueDemandesCsv } from "../../utils/exportHistoriqueRhCsv";
 import { libelleAffichageTypeConge } from "../../utils/country";
@@ -34,6 +34,8 @@ export default function RequestsList() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [rows, setRows] = useState([]);
+  const [page, setPage] = useState(1);
+  const perPage = 10;
   const [filters, setFilters] = useState({
     status: "ALL",
     employee: "",
@@ -46,6 +48,7 @@ export default function RequestsList() {
   const load = async () => {
     setLoading(true);
     setError("");
+    setPage(1);
     try {
       const data = await getHrRequests(filters);
       setRows(Array.isArray(data) ? data : []);
@@ -56,6 +59,10 @@ export default function RequestsList() {
       setLoading(false);
     }
   };
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / perPage));
+  const pageSafe = Math.min(page, totalPages);
+  const paginatedRows = rows.slice((pageSafe - 1) * perPage, pageSafe * perPage);
 
   useEffect(() => {
     load();
@@ -266,7 +273,7 @@ export default function RequestsList() {
                     </tr>
                   )}
                   {!loading &&
-                    rows.map((r) => (
+                    paginatedRows.map((r) => (
                       <motion.tr
                         key={r.id}
                         variants={itemVariants}
@@ -334,6 +341,37 @@ export default function RequestsList() {
               </table>
             </div>
           </motion.div>
+
+          {totalPages > 1 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="flex items-center justify-between gap-md mt-lg"
+            >
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={ChevronLeft}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={pageSafe === 1}
+              >
+                Précédent
+              </Button>
+              <div className="text-sm font-medium text-neutral-600">
+                Page {pageSafe} / {totalPages}
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={ChevronRight}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={pageSafe === totalPages}
+              >
+                Suivant
+              </Button>
+            </motion.div>
+          )}
         )}
       </ContentWrapper>
     </PageContainer>
