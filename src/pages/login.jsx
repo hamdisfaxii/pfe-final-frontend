@@ -1,6 +1,9 @@
 import React, { useState } from "react";
+import { motion } from "framer-motion";
+import { AlertCircle, Mail, Lock } from "lucide-react";
 import { useAuth } from "../context/authcontext";
 import { useNavigate } from "react-router-dom";
+import { Button } from "../components/ui";
 
 function readApiErrorPayload(err) {
   const d = err?.response?.data;
@@ -151,60 +154,97 @@ function Login() {
 
   return (
     <div
-      className="w-screen h-screen bg-cover bg-center bg-no-repeat"
+      className="w-screen h-screen bg-cover bg-center bg-no-repeat flex items-center justify-start"
       style={{
         backgroundImage: "url('/login-background.png')",
         backgroundSize: "cover",
       }}
     >
-      <div className="w-[500px] bg-white p-8 rounded-2xl shadow-2xl border border-slate-100 absolute left-[200px] top-1/2 -translate-y-1/2">
-        <div className="flex justify-center mb-8">
-          <h1 className="text-3xl font-bold text-slate-900">Connexion</h1>
-        </div>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, x: -30 }}
+        animate={{ opacity: 1, scale: 1, x: 0 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="w-full max-w-md ml-[120px] mr-auto bg-white p-md rounded-2xl shadow-lg border border-neutral-100 backdrop-blur-sm bg-white/95"
+      >
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+          className="text-center mb-8"
+        >
+          <h1 className="text-3xl font-bold text-neutral-900">Connexion</h1>
+          <p className="text-sm text-neutral-500 mt-2">Accédez à votre espace de congés</p>
+        </motion.div>
 
-        <div>
-          {error && (
-            <div className="mb-4 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-lg text-sm flex items-start gap-2">
-              <div className="mt-0.5 shrink-0">⚠️</div>
-              <div className="min-w-0 whitespace-pre-line leading-relaxed">
-                {error.split("\n").map((line, i) => (
-                  <span key={i} className="block">
-                    {i === 0 ? (
-                      <span className="font-semibold text-red-800">{line}</span>
-                    ) : (
-                      <span className="font-normal text-red-700 mt-1 block">
-                        {line}
-                      </span>
-                    )}
-                  </span>
-                ))}
-              </div>
+        {/* Error Message */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-sm bg-danger-50 border border-danger-200 rounded-lg text-sm flex items-start gap-sm"
+          >
+            <AlertCircle size={20} className="text-danger-600 flex-shrink-0 mt-xs" />
+            <div className="min-w-0 whitespace-pre-line leading-relaxed">
+              {error.split("\n").map((line, i) => (
+                <span key={i} className="block">
+                  {i === 0 ? (
+                    <span className="font-semibold text-danger-900">{line}</span>
+                  ) : (
+                    <span className="font-normal text-danger-800 mt-xs block">
+                      {line}
+                    </span>
+                  )}
+                </span>
+              ))}
             </div>
-          )}
+          </motion.div>
+        )}
 
-          <form className="space-y-5" onSubmit={handleSubmit}>
-            <div>
-              <label htmlFor="login-email" className="block text-sm font-semibold text-slate-700 mb-2">
-                Identifiant / Email
-              </label>
+        {/* Form */}
+        <motion.form
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+          className="space-y-md"
+          onSubmit={handleSubmit}
+        >
+          {/* Email Input */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.25 }}
+          >
+            <label htmlFor="login-email" className="block text-sm font-semibold text-neutral-900 mb-xs">
+              Email / Identifiant
+            </label>
+            <div className="relative">
+              <Mail size={18} className="absolute left-sm top-1/2 -translate-y-1/2 text-neutral-400" />
               <input
                 id="login-email"
                 type="text"
-                placeholder="Identifiant ou adresse email"
+                placeholder="user@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={loading}
-                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 
-                focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent 
-                transition-all duration-300 disabled:opacity-50"
+                className="w-full pl-10 pr-sm py-xs bg-white border border-neutral-300 rounded-lg text-neutral-900 placeholder-neutral-400
+                focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
+                transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
+          </motion.div>
 
-            <div>
-              <label htmlFor="login-password" className="block text-sm font-semibold text-slate-700 mb-2">
-                Mot de passe
-              </label>
+          {/* Password Input */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.3 }}
+          >
+            <label htmlFor="login-password" className="block text-sm font-semibold text-neutral-900 mb-xs">
+              Mot de passe
+            </label>
+            <div className="relative">
+              <Lock size={18} className="absolute left-sm top-1/2 -translate-y-1/2 text-neutral-400" />
               <input
                 id="login-password"
                 type="password"
@@ -213,37 +253,49 @@ function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={loading}
-                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 
-                focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent 
-                transition-all duration-300 disabled:opacity-50"
+                className="w-full pl-10 pr-sm py-xs bg-white border border-neutral-300 rounded-lg text-neutral-900 placeholder-neutral-400
+                focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
+                transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
+          </motion.div>
 
-            <button
+          {/* Submit Button */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.35 }}
+          >
+            <Button
               type="submit"
+              variant="primary"
+              fullWidth
+              isLoading={loading}
               disabled={loading}
-              className="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold 
-              hover:bg-blue-700 hover:shadow-lg
-              active:scale-[0.98] 
-              disabled:opacity-50 disabled:cursor-not-allowed
-              transition-all duration-300"
+              className="py-xs"
             >
               {loading ? "Connexion en cours..." : "Se connecter"}
-            </button>
+            </Button>
+          </motion.div>
 
-            <div className="text-center pt-2">
-              <p className="text-sm text-slate-600">
-                <a
-                  href="http://localhost/dolibarr/user/passwordforgotten.php"
-                  className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
-                >
-                  Mot de passe oublié?
-                </a>
-              </p>
-            </div>
-          </form>
-        </div>
-      </div>
+          {/* Forgot Password Link */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4, delay: 0.4 }}
+            className="text-center pt-xs border-t border-neutral-200"
+          >
+            <p className="text-sm text-neutral-600">
+              <a
+                href="http://localhost/dolibarr/user/passwordforgotten.php"
+                className="text-primary-600 hover:text-primary-700 font-medium transition-colors"
+              >
+                Mot de passe oublié?
+              </a>
+            </p>
+          </motion.div>
+        </motion.form>
+      </motion.div>
     </div>
   );
 }

@@ -1,12 +1,22 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { motion } from "framer-motion";
+import { AlertCircle, ArrowLeft, Trash2 } from "lucide-react";
 import useDemandes from "../../hooks/useDemandes";
-import StatutBadge from "../../components/employee/StatutBadge";
-import ModalConfirmation from "../../components/commun/ModalConfirmation";
-import Spinner from "../../components/commun/Spinner";
 import { formaterDate } from "../../utils/calculJours";
 import { libelleAffichageTypeConge } from "../../utils/country";
 import { useAuth } from "../../context/authcontext";
+import {
+  PageContainer,
+  ContentWrapper,
+  PageHeader,
+  Button,
+  Card,
+  CardContent,
+  StatusBadge,
+  Spinner,
+  Modal,
+} from "../../components/ui";
 
 const formatDecimalFr = (val) => {
   if (val == null || !Number.isFinite(Number(val))) return "—";
@@ -16,11 +26,7 @@ const formatDecimalFr = (val) => {
 };
 
 const normalizeForStatus = (statut) => {
-  const raw = String(statut ?? "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "");
+  const raw = String(statut ?? "").trim().toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
   return raw.replace(/\s+/g, "_");
 };
 
@@ -35,10 +41,9 @@ export default function DetailDemande() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { user } = useAuth();
-  const { demandeDetail, loading, error, fetchDemandeById, annulerDemande } =
-    useDemandes();
-
+  const { demandeDetail, loading, error, fetchDemandeById, annulerDemande } = useDemandes();
   const [modal, setModal] = useState({ isOpen: false, demandeId: null });
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (id) fetchDemandeById(id).catch(() => {});
@@ -52,232 +57,199 @@ export default function DetailDemande() {
 
   const handleConfirmCancel = async () => {
     try {
+      setSubmitting(true);
       if (!modal.demandeId) return;
       await annulerDemande(modal.demandeId);
       setModal({ isOpen: false, demandeId: null });
       navigate("/employee/historique");
     } catch {
-      // hook already sets error
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-3xl mx-auto px-6 py-10">
-        <div className="mb-8">
-          <button
-            type="button"
-            onClick={() => navigate("/employee/historique")}
-            className="text-sm font-semibold text-blue-600 hover:text-blue-700 transition-all"
-          >
-            &lt; Retour
-          </button>
-        </div>
-
-        <h1 className="text-4xl font-bold text-slate-900">
-          Détail de la demande
-        </h1>
+    <PageContainer>
+      <ContentWrapper>
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+          <PageHeader
+            title="Détail de la demande"
+            description="Consultez les informations complètes de votre demande"
+            action={
+              <Button variant="secondary" size="sm" icon={ArrowLeft} onClick={() => navigate("/employee/historique")}>
+                Retour
+              </Button>
+            }
+          />
+        </motion.div>
 
         {loading && !demandeDetail ? (
-          <div className="mt-8">
-            <Spinner />
+          <div className="mt-lg">
+            <Spinner size="lg" />
           </div>
         ) : (
           <>
             {error && (
-              <div className="mt-4 rounded-xl border-l-4 border-red-500 bg-red-50 p-4 shadow-sm">
-                <div className="flex items-start gap-3">
-                  <div className="text-red-500 mt-0.5">⚠️</div>
-                  <div className="text-sm font-medium text-red-700">
-                    {error}
-                  </div>
-                </div>
-              </div>
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-lg p-sm bg-danger-50 border border-danger-200 rounded-lg flex items-start gap-sm"
+              >
+                <AlertCircle size={20} className="text-danger-600 flex-shrink-0 mt-xs" />
+                <p className="text-sm text-danger-900">{error}</p>
+              </motion.div>
             )}
 
             {demandeDetail ? (
-              <div className="mt-8 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 fade-in-up">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div>
-                    <div className="text-sm font-semibold text-slate-500 uppercase tracking-wide">
-                      Titre
-                    </div>
-                    <div className="text-2xl font-bold text-slate-900 mt-2">
-                      {libelleAffichageTypeConge(
-                        demandeDetail?.titre ??
-                          demandeDetail?.typeConge ??
-                          demandeDetail?.type,
-                        user?.country ?? user?.pays,
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center">
-                    <StatutBadge statut={statut} />
-                  </div>
-                </div>
-
-                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div>
-                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                      Approuvé par
-                    </div>
-                    <div className="font-semibold text-slate-900 mt-1">
-                      {(() => {
-                        const ap =
-                          demandeDetail?.approuvePar ??
-                          demandeDetail?.approvedBy ??
-                          null;
-                        if (!ap) return "--";
-                        if (typeof ap === "string") return ap;
-                        const nm =
-                          `${ap?.prenom ?? ap?.firstName ?? ""} ${ap?.nom ?? ap?.lastName ?? ""}`.trim();
-                        return (
-                          nm || ap?.name || ap?.fullName || ap?.email || "--"
-                        );
-                      })()}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                      Date début
-                    </div>
-                    <div className="font-semibold text-slate-900 mt-1">
-                      {formaterDate(
-                        demandeDetail?.dateDebut ?? demandeDetail?.debut,
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                      Date fin
-                    </div>
-                    <div className="font-semibold text-slate-900 mt-1">
-                      {formaterDate(
-                        demandeDetail?.dateFin ?? demandeDetail?.fin,
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                      Nombre de jours
-                    </div>
-                    <div className="font-semibold text-slate-900 mt-1">
-                      {(() => {
-                        const exact =
-                          demandeDetail?.nombreJoursExact ??
-                          demandeDetail?.joursExact ??
-                          null;
-                        const raw =
-                          demandeDetail?.nbJours ??
-                          demandeDetail?.nombreJours ??
-                          demandeDetail?.jours ??
-                          null;
-                        const n =
-                          typeof exact === "number"
-                            ? exact
-                            : typeof raw === "number"
-                              ? raw
-                              : Number(raw);
-                        const val = Number.isFinite(n) ? n : null;
-                        const sh = String(
-                          demandeDetail?.startHalfDay ?? "",
-                        ).toUpperCase();
-                        const eh = String(
-                          demandeDetail?.endHalfDay ?? "",
-                        ).toUpperCase();
-                        const labelHalf = (h) =>
-                          h === "MORNING"
-                            ? "Matin"
-                            : h === "AFTERNOON"
-                              ? "Après-midi"
-                              : "";
-                        const halfInfo =
-                          sh || eh
-                            ? ` (${labelHalf(sh) || "Journée"} → ${labelHalf(eh) || "Journée"})`
-                            : "";
-                        return val == null
-                          ? "--"
-                          : `${formatDecimalFr(val)} jour(s)${halfInfo}`;
-                      })()}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                      Commentaire
-                    </div>
-                    <div className="text-slate-700 mt-1">
-                      {demandeDetail?.commentaire ?? "--"}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 border-t border-slate-200 pt-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div>
-                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                      Date de soumission
-                    </div>
-                    <div className="font-semibold text-slate-900 mt-1">
-                      {formaterDate(
-                        demandeDetail?.dateSoumission ??
-                          demandeDetail?.createdAt ??
-                          demandeDetail?.soumisLe,
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                      Date de réponse
-                    </div>
-                    <div className="font-semibold text-slate-900 mt-1">
-                      {canAnnuler
-                        ? "--"
-                        : formaterDate(
-                            demandeDetail?.dateReponse ??
-                              demandeDetail?.reponseAt ??
-                              demandeDetail?.validatedAt,
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
+              >
+                <Card variant="default">
+                  <CardContent className="pt-lg">
+                    {/* Header */}
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-sm mb-lg pb-lg border-b border-neutral-200">
+                      <div>
+                        <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-xs">
+                          Type de demande
+                        </p>
+                        <h2 className="text-2xl font-bold text-neutral-900">
+                          {libelleAffichageTypeConge(
+                            demandeDetail?.titre ?? demandeDetail?.typeConge ?? demandeDetail?.type,
+                            user?.country ?? user?.pays,
                           )}
+                        </h2>
+                      </div>
+                      <StatusBadge statut={statut} />
                     </div>
-                  </div>
-                </div>
 
-                {canAnnuler && (
-                  <div className="mt-6">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setModal({
-                          isOpen: true,
-                          demandeId: pickId(demandeDetail),
-                        })
-                      }
-                      className="px-4 py-3 rounded-lg bg-red-100 text-sm font-semibold text-red-700 hover:bg-red-200 transition-all"
-                    >
-                      Annuler la demande
-                    </button>
-                  </div>
-                )}
-              </div>
+                    {/* Details Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-lg mb-lg">
+                      <div>
+                        <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-xs">
+                          Approuvé par
+                        </p>
+                        <p className="text-base font-semibold text-neutral-900">
+                          {(() => {
+                            const ap = demandeDetail?.approuvePar ?? demandeDetail?.approvedBy ?? null;
+                            if (!ap) return "--";
+                            if (typeof ap === "string") return ap;
+                            const nm = `${ap?.prenom ?? ap?.firstName ?? ""} ${ap?.nom ?? ap?.lastName ?? ""}`.trim();
+                            return nm || ap?.name || ap?.fullName || ap?.email || "--";
+                          })()}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-xs">
+                          Date début
+                        </p>
+                        <p className="text-base font-semibold text-neutral-900">
+                          {formaterDate(demandeDetail?.dateDebut ?? demandeDetail?.debut)}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-xs">
+                          Date fin
+                        </p>
+                        <p className="text-base font-semibold text-neutral-900">
+                          {formaterDate(demandeDetail?.dateFin ?? demandeDetail?.fin)}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-xs">
+                          Nombre de jours
+                        </p>
+                        <p className="text-base font-semibold text-neutral-900">
+                          {(() => {
+                            const exact = demandeDetail?.nombreJoursExact ?? demandeDetail?.joursExact ?? null;
+                            const raw = demandeDetail?.nbJours ?? demandeDetail?.nombreJours ?? demandeDetail?.jours ?? null;
+                            const n = typeof exact === "number" ? exact : typeof raw === "number" ? raw : Number(raw);
+                            const val = Number.isFinite(n) ? n : null;
+                            const sh = String(demandeDetail?.startHalfDay ?? "").toUpperCase();
+                            const eh = String(demandeDetail?.endHalfDay ?? "").toUpperCase();
+                            const labelHalf = (h) => (h === "MORNING" ? "Matin" : h === "AFTERNOON" ? "Après-midi" : "");
+                            const halfInfo = sh || eh ? ` (${labelHalf(sh) || "Journée"} → ${labelHalf(eh) || "Journée"})` : "";
+                            return val == null ? "--" : `${formatDecimalFr(val)} jour(s)${halfInfo}`;
+                          })()}
+                        </p>
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-xs">
+                          Commentaire
+                        </p>
+                        <p className="text-base text-neutral-700">{demandeDetail?.commentaire ?? "--"}</p>
+                      </div>
+                    </div>
+
+                    {/* Dates Section */}
+                    <div className="border-t border-neutral-200 pt-lg mt-lg">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
+                        <div>
+                          <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-xs">
+                            Date de soumission
+                          </p>
+                          <p className="text-base font-semibold text-neutral-900">
+                            {formaterDate(demandeDetail?.dateSoumission ?? demandeDetail?.createdAt ?? demandeDetail?.soumisLe)}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-xs">
+                            Date de réponse
+                          </p>
+                          <p className="text-base font-semibold text-neutral-900">
+                            {canAnnuler
+                              ? "--"
+                              : formaterDate(demandeDetail?.dateReponse ?? demandeDetail?.reponseAt ?? demandeDetail?.validatedAt)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Cancel Button */}
+                    {canAnnuler && (
+                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mt-lg pt-lg border-t border-neutral-200">
+                        <Button
+                          variant="danger"
+                          icon={Trash2}
+                          onClick={() => setModal({ isOpen: true, demandeId: pickId(demandeDetail) })}
+                        >
+                          Annuler la demande
+                        </Button>
+                      </motion.div>
+                    )}
+                  </CardContent>
+                </Card>
+              </motion.div>
             ) : (
-              <div className="mt-8 text-slate-600 font-medium">
-                Demande introuvable.
-              </div>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-lg">
+                <p className="text-neutral-600 font-medium">Demande introuvable.</p>
+              </motion.div>
             )}
           </>
         )}
 
-        <ModalConfirmation
+        {/* Confirmation Modal */}
+        <Modal
           isOpen={modal.isOpen}
           onClose={() => setModal({ isOpen: false, demandeId: null })}
-          onConfirm={handleConfirmCancel}
-          titre="Confirmer l'annulation"
-          message="Voulez-vous vraiment annuler cette demande ?"
-        />
-      </div>
-    </div>
+          title="Confirmer l'annulation"
+          description="Êtes-vous sûr de vouloir annuler cette demande ?"
+        >
+          <div className="flex gap-sm justify-end mt-lg">
+            <Button variant="ghost" onClick={() => setModal({ isOpen: false, demandeId: null })}>
+              Annuler
+            </Button>
+            <Button variant="danger" isLoading={submitting} onClick={handleConfirmCancel} disabled={submitting}>
+              Confirmer l'annulation
+            </Button>
+          </div>
+        </Modal>
+      </ContentWrapper>
+    </PageContainer>
   );
 }

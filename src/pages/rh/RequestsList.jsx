@@ -1,10 +1,20 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import { AlertCircle, Download, Search, Filter } from "lucide-react";
 import { getHrRequests } from "../../utils/rhApi";
 import { downloadHistoriqueDemandesCsv } from "../../utils/exportHistoriqueRhCsv";
-import Spinner from "../../components/commun/Spinner";
-import StatutBadge from "../../components/employee/StatutBadge";
 import { libelleAffichageTypeConge } from "../../utils/country";
+import {
+  PageContainer,
+  ContentWrapper,
+  PageHeader,
+  Button,
+  Card,
+  CardContent,
+  StatusBadge,
+  Spinner,
+} from "../../components/ui";
 
 const formatDateFr = (raw) => {
   if (!raw) return "—";
@@ -52,200 +62,280 @@ export default function RequestsList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chargement initial seulement
   }, []);
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.05, delayChildren: 0.2 },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 10 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 py-10">
-        <h1 className="text-4xl font-bold text-slate-900 fade-in-up">
-          Historique des demandes
-        </h1>
-        <p
-          className="mt-3 text-sm text-slate-600 fade-in-up max-w-3xl leading-relaxed"
-          style={{ animationDelay: "0.05s" }}
-        >
-          Toutes les demandes (en attente, approuvées, rejetées). Filtrez par
-          statut ou période, puis exportez au format tableur CSV pour Excel
-          (séparateur ; , encodage UTF-8 avec BOM).
-        </p>
+    <PageContainer>
+      <ContentWrapper>
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+          <PageHeader
+            title="Historique des demandes"
+            description="Consultez, filtrez et exportez toutes les demandes de congés"
+          />
+        </motion.div>
 
-        <div className="mt-6 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm fade-in-up">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-6">
-            <select
-              value={filters.status}
-              onChange={(e) =>
-                setFilters((p) => ({ ...p, status: e.target.value }))
-              }
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="ALL">Tous les statuts</option>
-              <option value="PENDING">En attente</option>
-              <option value="APPROVED">Approuvé</option>
-              <option value="REJECTED">Rejeté</option>
-            </select>
-            <input
-              value={filters.employee}
-              onChange={(e) =>
-                setFilters((p) => ({ ...p, employee: e.target.value }))
-              }
-              placeholder="Employé"
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              value={filters.country}
-              onChange={(e) =>
-                setFilters((p) => ({ ...p, country: e.target.value }))
-              }
-              placeholder="Pays"
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              value={filters.department}
-              onChange={(e) =>
-                setFilters((p) => ({ ...p, department: e.target.value }))
-              }
-              placeholder="Département"
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              type="date"
-              value={filters.startDate}
-              onChange={(e) =>
-                setFilters((p) => ({ ...p, startDate: e.target.value }))
-              }
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              type="date"
-              value={filters.endDate}
-              onChange={(e) =>
-                setFilters((p) => ({ ...p, endDate: e.target.value }))
-              }
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={load}
-              disabled={loading}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 hover:shadow-lg transition-all disabled:opacity-60"
-            >
-              Appliquer les filtres
-            </button>
-            <button
-              type="button"
-              disabled={loading || rows.length === 0}
-              onClick={() => downloadHistoriqueDemandesCsv(rows)}
-              className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Exporter (Excel CSV)
-            </button>
-          </div>
-        </div>
+        {/* Filters */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }} className="mb-lg">
+          <Card variant="default">
+            <CardContent className="pt-sm">
+              <div className="space-y-sm">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-sm">
+                  <div>
+                    <label htmlFor="filter-status" className="block text-xs font-semibold text-neutral-700 mb-xs">
+                      Statut
+                    </label>
+                    <select
+                      id="filter-status"
+                      value={filters.status}
+                      onChange={(e) =>
+                        setFilters((p) => ({ ...p, status: e.target.value }))
+                      }
+                      className="w-full px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                    >
+                      <option value="ALL">Tous les statuts</option>
+                      <option value="PENDING">En attente</option>
+                      <option value="APPROVED">Approuvé</option>
+                      <option value="REJECTED">Rejeté</option>
+                    </select>
+                  </div>
 
+                  <div>
+                    <label htmlFor="filter-employee" className="block text-xs font-semibold text-neutral-700 mb-xs">
+                      Employé
+                    </label>
+                    <input
+                      id="filter-employee"
+                      value={filters.employee}
+                      onChange={(e) =>
+                        setFilters((p) => ({ ...p, employee: e.target.value }))
+                      }
+                      placeholder="Rechercher..."
+                      className="w-full px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="filter-country" className="block text-xs font-semibold text-neutral-700 mb-xs">
+                      Pays
+                    </label>
+                    <input
+                      id="filter-country"
+                      value={filters.country}
+                      onChange={(e) =>
+                        setFilters((p) => ({ ...p, country: e.target.value }))
+                      }
+                      placeholder="Rechercher..."
+                      className="w-full px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="filter-department" className="block text-xs font-semibold text-neutral-700 mb-xs">
+                      Département
+                    </label>
+                    <input
+                      id="filter-department"
+                      value={filters.department}
+                      onChange={(e) =>
+                        setFilters((p) => ({ ...p, department: e.target.value }))
+                      }
+                      placeholder="Rechercher..."
+                      className="w-full px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="filter-start-date" className="block text-xs font-semibold text-neutral-700 mb-xs">
+                      Date début
+                    </label>
+                    <input
+                      id="filter-start-date"
+                      type="date"
+                      value={filters.startDate}
+                      onChange={(e) =>
+                        setFilters((p) => ({ ...p, startDate: e.target.value }))
+                      }
+                      className="w-full px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="filter-end-date" className="block text-xs font-semibold text-neutral-700 mb-xs">
+                      Date fin
+                    </label>
+                    <input
+                      id="filter-end-date"
+                      type="date"
+                      value={filters.endDate}
+                      onChange={(e) =>
+                        setFilters((p) => ({ ...p, endDate: e.target.value }))
+                      }
+                      className="w-full px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-sm pt-sm border-t border-neutral-200">
+                  <Button
+                    icon={Filter}
+                    onClick={load}
+                    disabled={loading}
+                    isLoading={loading}
+                  >
+                    Appliquer les filtres
+                  </Button>
+                  <Button
+                    variant="success"
+                    icon={Download}
+                    disabled={loading || rows.length === 0}
+                    onClick={() => downloadHistoriqueDemandesCsv(rows)}
+                  >
+                    Exporter (CSV)
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Error */}
         {error && (
-          <div className="mt-4 rounded-xl border-l-4 border-red-500 bg-red-50 p-4 shadow-sm">
-            <div className="flex items-start gap-3">
-              <div className="text-red-500 mt-0.5">⚠️</div>
-              <div className="text-sm font-medium text-red-700">{error}</div>
-            </div>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-lg p-md bg-danger-50 border border-danger-200 rounded-lg flex items-start gap-sm"
+          >
+            <AlertCircle size={20} className="text-danger-600 flex-shrink-0 mt-xs" />
+            <p className="text-sm text-danger-900">{error}</p>
+          </motion.div>
         )}
 
+        {/* Table */}
         {loading && rows.length === 0 ? (
-          <div className="mt-8">
-            <Spinner size={3} />
+          <div className="mt-lg">
+            <Spinner size="lg" />
           </div>
         ) : (
-          <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-100 bg-white shadow-sm fade-in-up">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 text-left text-slate-700 border-b border-slate-200">
-                <tr>
-                  <th className="p-4 font-semibold text-slate-900">Employé</th>
-                  <th className="p-4 font-semibold text-slate-900">Type</th>
-                  <th className="p-4 font-semibold text-slate-900">Période</th>
-                  <th className="p-4 font-semibold text-slate-900">Durée</th>
-                  <th className="p-4 font-semibold text-slate-900">Statut</th>
-                  <th className="p-4 font-semibold text-slate-900">Détails</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading && (
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="rounded-2xl border border-neutral-200 bg-white overflow-hidden shadow-xs"
+          >
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead className="bg-neutral-50 border-b border-neutral-200">
                   <tr>
-                    <td colSpan={6} className="p-6 text-center text-slate-500">
-                      Chargement...
-                    </td>
+                    <th className="px-sm py-xs text-left text-xs font-semibold text-neutral-700">
+                      Employé
+                    </th>
+                    <th className="px-sm py-xs text-left text-xs font-semibold text-neutral-700">
+                      Type
+                    </th>
+                    <th className="px-sm py-xs text-left text-xs font-semibold text-neutral-700">
+                      Période
+                    </th>
+                    <th className="px-sm py-xs text-left text-xs font-semibold text-neutral-700">
+                      Durée
+                    </th>
+                    <th className="px-sm py-xs text-left text-xs font-semibold text-neutral-700">
+                      Statut
+                    </th>
+                    <th className="px-sm py-xs text-left text-xs font-semibold text-neutral-700">
+                      Action
+                    </th>
                   </tr>
-                )}
-                {!loading &&
-                  rows.map((r) => (
-                    <tr
-                      key={r.id}
-                      className="border-t border-slate-100 hover:bg-slate-50 transition-colors"
-                    >
-                      <td className="p-4 text-slate-700">
-                        {r.employe?.prenom} {r.employe?.nom}
-                      </td>
-                      <td className="p-4 text-slate-700">
-                        {libelleAffichageTypeConge(r.typeConge, r.employe?.country)}
-                      </td>
-                      <td className="p-4 text-slate-700">
-                        {formatDateFr(r.dateDebut)} → {formatDateFr(r.dateFin)}
-                      </td>
-                      <td className="p-4 text-slate-700">
-                        {(() => {
-                          const exact = r?.nombreJoursExact ?? null;
-                          const raw = r?.nombreJours ?? null;
-                          const n =
-                            typeof exact === "number"
-                              ? exact
-                              : typeof raw === "number"
-                                ? raw
-                                : Number(raw);
-                          const val = Number.isFinite(n) ? n : null;
-                          const sh = String(
-                            r?.startHalfDay ?? "",
-                          ).toUpperCase();
-                          const eh = String(r?.endHalfDay ?? "").toUpperCase();
-                          const labelHalf = (h) =>
-                            h === "MORNING"
-                              ? "Matin"
-                              : h === "AFTERNOON"
-                                ? "Après-midi"
-                                : "";
-                          const halfInfo =
-                            sh || eh
-                              ? ` (${labelHalf(sh) || "Journée"} → ${labelHalf(eh) || "Journée"})`
-                              : "";
-                          return val == null
-                            ? "-"
-                            : `${formatDecimalFr(val)} j${halfInfo}`;
-                        })()}
-                      </td>
-                      <td className="p-4">
-                        <StatutBadge statut={r.statut} />
-                      </td>
-                      <td className="p-4">
-                        <Link
-                          to={`/rh/requests/${r.id}`}
-                          className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition-all"
-                        >
-                          Ouvrir
-                        </Link>
+                </thead>
+                <tbody>
+                  {loading && (
+                    <tr>
+                      <td colSpan={6} className="px-sm py-md text-center text-neutral-500">
+                        Chargement...
                       </td>
                     </tr>
-                  ))}
-                {!loading && rows.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="p-6 text-center text-slate-500">
-                      Aucun résultat pour ces critères.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  )}
+                  {!loading &&
+                    rows.map((r) => (
+                      <motion.tr
+                        key={r.id}
+                        variants={itemVariants}
+                        className="border-t border-neutral-100 hover:bg-neutral-50 transition-colors"
+                      >
+                        <td className="px-sm py-xs text-sm text-neutral-700">
+                          {r.employe?.prenom} {r.employe?.nom}
+                        </td>
+                        <td className="px-sm py-xs text-sm text-neutral-700">
+                          {libelleAffichageTypeConge(r.typeConge, r.employe?.country)}
+                        </td>
+                        <td className="px-sm py-xs text-sm text-neutral-700">
+                          {formatDateFr(r.dateDebut)} → {formatDateFr(r.dateFin)}
+                        </td>
+                        <td className="px-sm py-xs text-sm text-neutral-700">
+                          {(() => {
+                            const exact = r?.nombreJoursExact ?? null;
+                            const raw = r?.nombreJours ?? null;
+                            const n =
+                              typeof exact === "number"
+                                ? exact
+                                : typeof raw === "number"
+                                  ? raw
+                                  : Number(raw);
+                            const val = Number.isFinite(n) ? n : null;
+                            const sh = String(
+                              r?.startHalfDay ?? "",
+                            ).toUpperCase();
+                            const eh = String(r?.endHalfDay ?? "").toUpperCase();
+                            const labelHalf = (h) =>
+                              h === "MORNING"
+                                ? "Matin"
+                                : h === "AFTERNOON"
+                                  ? "Après-midi"
+                                  : "";
+                            const halfInfo =
+                              sh || eh
+                                ? ` (${labelHalf(sh) || "Journée"} → ${labelHalf(eh) || "Journée"})`
+                                : "";
+                            return val == null
+                              ? "-"
+                              : `${formatDecimalFr(val)} j${halfInfo}`;
+                          })()}
+                        </td>
+                        <td className="px-sm py-xs">
+                          <StatusBadge statut={r.statut} />
+                        </td>
+                        <td className="px-sm py-xs">
+                          <Link to={`/rh/requests/${r.id}`}>
+                            <Button variant="secondary" size="xs">
+                              Ouvrir
+                            </Button>
+                          </Link>
+                        </td>
+                      </motion.tr>
+                    ))}
+                  {!loading && rows.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-sm py-md text-center text-neutral-500">
+                        Aucun résultat pour ces critères.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
         )}
-      </div>
-    </div>
+      </ContentWrapper>
+    </PageContainer>
   );
 }

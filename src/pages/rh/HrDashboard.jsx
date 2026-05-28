@@ -1,8 +1,34 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import {
+  BarChart3,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  Settings,
+  Calendar,
+  Users,
+  FileText,
+  TrendingUp,
+} from "lucide-react";
 import { getHrStats } from "../../utils/rhApi";
-import Spinner from "../../components/commun/Spinner";
-import AIValidationModule from "../../components/AIValidationModule";
+import {
+  PageContainer,
+  ContentWrapper,
+  PageHeader,
+  Grid,
+  StatCard,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+  Button,
+  Spinner,
+  showToast,
+} from "../../components/ui";
 
 export default function HrDashboard() {
   const [loading, setLoading] = useState(false);
@@ -31,115 +57,201 @@ export default function HrDashboard() {
     load();
   }, []);
 
-  const cards = [
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.2,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.4, ease: "easeOut" },
+    },
+  };
+
+  const quickActions = [
     {
-      label: "En attente",
-      value: stats.pending,
-      containerClass: "bg-white border-slate-200",
-      badgeClass: "bg-amber-100 text-amber-800",
-      valueClass: "text-slate-900",
+      icon: FileText,
+      title: "Historique des demandes",
+      description: "Examiner et traiter les demandes",
+      href: "/rh/requests",
+      color: "primary",
     },
     {
-      label: "Approuvées",
-      value: stats.approved,
-      containerClass: "bg-white border-slate-200",
-      badgeClass: "bg-emerald-100 text-emerald-800",
-      valueClass: "text-slate-900",
+      icon: CheckCircle2,
+      title: "Module de décision",
+      description: "Approuver ou refuser les congés",
+      href: "/rh/decisions",
+      color: "success",
     },
     {
-      label: "Rejetées",
-      value: stats.rejected,
-      containerClass: "bg-white border-slate-200",
-      badgeClass: "bg-red-100 text-red-800",
-      valueClass: "text-slate-900",
+      icon: Calendar,
+      title: "Calendrier RH",
+      description: "Vue d'ensemble des congés",
+      href: "/rh/calendar",
+      color: "warning",
     },
     {
-      label: "Total",
-      value: stats.total,
-      containerClass: "bg-slate-900 border-slate-900",
-      badgeClass: "bg-slate-700 text-slate-100",
-      valueClass: "text-white",
+      icon: Users,
+      title: "Soldes des employés",
+      description: "Consulter les soldes restants",
+      href: "/rh/soldes",
+      color: "info",
+    },
+    {
+      icon: Calendar,
+      title: "Jours fériés",
+      description: "Gérer les jours fériés",
+      href: "/rh/jours-feries",
+      color: "danger",
+    },
+    {
+      icon: Settings,
+      title: "Configuration",
+      description: "Paramètres RH",
+      href: "/rh/configuration",
+      color: "neutral",
     },
   ];
 
+  const approvalRate =
+    stats.total > 0
+      ? Math.round((stats.approved / stats.total) * 100)
+      : 0;
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-6xl mx-auto px-6 py-10">
-        <h1 className="text-4xl font-bold text-slate-900 fade-in-up">
-          Tableau de bord RH
-        </h1>
-        <p className="mt-3 text-sm text-slate-600 fade-in-up" style={{ animationDelay: "0.05s" }}>
-          Vue globale des décisions et du workflow des demandes de congé.
-        </p>
+    <PageContainer>
+      <ContentWrapper>
+        {/* Header */}
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+          <PageHeader
+            title="Tableau de bord RH"
+            description="Gérez les demandes de congés et supervisez les équipes"
+            action={
+              <Button size="sm" variant="secondary" onClick={load} disabled={loading}>
+                Rafraîchir
+              </Button>
+            }
+          />
+        </motion.div>
 
+        {/* Error Banner */}
         {error && (
-          <div className="mt-4 rounded-xl border-l-4 border-red-500 bg-red-50 p-4 shadow-sm">
-            <div className="flex items-start gap-3">
-              <div className="text-red-500 mt-0.5">⚠️</div>
-              <div className="text-sm font-medium text-red-700">{error}</div>
-            </div>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-lg p-sm bg-danger-50 border border-danger-200 rounded-lg"
+          >
+            <p className="font-semibold text-danger-900">{error}</p>
+          </motion.div>
         )}
 
-        {loading && (
-          <div className="mt-8">
-            <Spinner size={3} />
-          </div>
+        {/* Statistics */}
+        {loading ? (
+          <Spinner size="lg" />
+        ) : (
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="mb-2xl"
+          >
+            <Grid columns={4} gap="md">
+              <motion.div variants={itemVariants}>
+                <StatCard
+                  label="En attente"
+                  value={stats.pending}
+                  icon={Clock}
+                  variant="warning"
+                />
+              </motion.div>
+
+              <motion.div variants={itemVariants}>
+                <StatCard
+                  label="Approuvées"
+                  value={stats.approved}
+                  icon={CheckCircle2}
+                  variant="success"
+                  trend="up"
+                  trendLabel={`${approvalRate}% d'approbation`}
+                />
+              </motion.div>
+
+              <motion.div variants={itemVariants}>
+                <StatCard
+                  label="Rejetées"
+                  value={stats.rejected}
+                  icon={XCircle}
+                  variant="danger"
+                />
+              </motion.div>
+
+              <motion.div variants={itemVariants}>
+                <StatCard
+                  label="Total"
+                  value={stats.total}
+                  icon={BarChart3}
+                  variant="dark"
+                />
+              </motion.div>
+            </Grid>
+          </motion.div>
         )}
 
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {cards.map((card) => (
-            <div
-              key={card.label}
-              className={`rounded-2xl border p-5 shadow-sm transition-all hover:shadow-md ${card.containerClass}`}
-            >
-              <div
-                className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${card.badgeClass}`}
-              >
-                {card.label}
-              </div>
-              <div className={`mt-3 text-3xl font-bold ${card.valueClass}`}>
-                {loading ? "..." : card.value}
-              </div>
-            </div>
-          ))}
-        </div>
 
-        <AIValidationModule />
+        {/* Quick Actions */}
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          <h2 className="text-xl font-semibold text-neutral-900 mb-md">Actions rapides</h2>
 
-        <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 fade-in-up">
-          <Link
-            to="/rh/requests"
-            className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50 hover:border-blue-200 transition-all"
-          >
-            Historique des demandes
-          </Link>
-          <Link
-            to="/rh/decisions"
-            className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50 hover:border-blue-200 transition-all"
-          >
-            Module de décision
-          </Link>
-          <Link
-            to="/rh/calendar"
-            className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50 hover:border-blue-200 transition-all"
-          >
-            Calendrier des congés
-          </Link>
-          <Link
-            to="/rh/configuration"
-            className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50 hover:border-blue-200 transition-all"
-          >
-            Configuration RH
-          </Link>
-          <Link
-            to="/rh/jours-feries"
-            className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50 hover:border-blue-200 transition-all"
-          >
-            Jours fériés
-          </Link>
-        </div>
-      </div>
-    </div>
+          <Grid columns={3} gap="md">
+            {quickActions.map((action, index) => {
+              const Icon = action.icon;
+              const colorMap = {
+                primary: "primary",
+                success: "success",
+                warning: "warning",
+                danger: "danger",
+                info: "primary",
+                neutral: "default",
+              };
+
+              return (
+                <motion.div key={index} variants={itemVariants}>
+                  <Link to={action.href} className="block">
+                    <Card
+                      variant={colorMap[action.color]}
+                      interactive
+                      className="cursor-pointer h-full hover:border-current hover:border-opacity-50"
+                    >
+                      <div className="flex flex-col h-full">
+                        <div className="inline-flex p-sm rounded-lg w-fit mb-sm opacity-75">
+                          <Icon size={24} />
+                        </div>
+                        <h3 className="font-semibold text-neutral-900 mb-xs">{action.title}</h3>
+                        <p className="text-sm text-neutral-600 flex-1 opacity-75">
+                          {action.description}
+                        </p>
+                      </div>
+                    </Card>
+                  </Link>
+                </motion.div>
+              );
+            })}
+          </Grid>
+        </motion.div>
+      </ContentWrapper>
+    </PageContainer>
   );
 }

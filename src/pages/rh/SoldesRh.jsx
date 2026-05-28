@@ -1,7 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import { AlertCircle, CheckCircle2, RefreshCw } from "lucide-react";
 import api from "../../utils/api";
-import Spinner from "../../components/commun/Spinner";
 import { normalizeCountryIsoForHr } from "../../utils/country";
+import {
+  PageContainer,
+  ContentWrapper,
+  PageHeader,
+  Button,
+  Card,
+  CardContent,
+  Spinner,
+} from "../../components/ui";
 
 const clamp = (n, min, max) => Math.min(Math.max(n, min), max);
 
@@ -259,271 +269,267 @@ export default function SoldesRh() {
 
   const inputCls = (readonly) =>
     [
-      "w-full min-w-[4.5rem] max-w-[6.5rem] rounded border px-2 py-1.5 text-sm tabular-nums text-slate-800",
+      "w-full min-w-[4.5rem] max-w-[6.5rem] rounded border px-sm py-xs text-sm tabular-nums text-neutral-900",
       readonly
-        ? "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed"
-        : "border-slate-300 bg-white focus:outline-none focus:ring-1 focus:ring-violet-500 focus:border-violet-500",
+        ? "border-neutral-200 bg-neutral-50 text-neutral-400 cursor-not-allowed"
+        : "border-neutral-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all",
     ].join(" ");
 
-  const theadCls =
-    "bg-slate-100 text-[10px] font-semibold uppercase tracking-wide text-slate-600 border-b border-slate-200";
-
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-8">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-              Soldes de congés
-            </h1>
-          </div>
-          <div className="flex flex-wrap gap-2 items-center">
-            <button
-              type="button"
-              onClick={load}
-              disabled={loading || savingRowId != null}
-              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
-            >
-              Rafraîchir
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-5 rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50/80 px-3 py-2.5">
-            <div className="flex flex-1 min-w-[200px] items-center gap-2 rounded border border-slate-300 bg-white px-2 py-1.5 shadow-sm">
-              <span className="text-slate-400" aria-hidden>
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-              </span>
-              <input
-                value={q}
-                onChange={(e) => {
-                  setQ(e.target.value);
-                  setPage(0);
-                }}
-                placeholder="Rechercher…"
-                className="min-w-0 flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-slate-400"
-              />
-            </div>
-            <select
-              value={size}
-              onChange={(e) => {
-                setSize(clamp(Number(e.target.value), 5, 50));
-                setPage(0);
-              }}
-              className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm"
-            >
-              <option value={5}>5 / page</option>
-              <option value={10}>10 / page</option>
-              <option value={20}>20 / page</option>
-              <option value={50}>50 / page</option>
-            </select>
-            <div className="ml-auto flex gap-1">
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-                disabled={loading || page <= 0}
-                className="rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+    <PageContainer>
+      <ContentWrapper>
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+          <PageHeader
+            title="Soldes de congés"
+            description="Consultez et gérez les soldes des employés"
+            action={
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={RefreshCw}
+                onClick={load}
+                disabled={loading || savingRowId != null}
               >
-                ←
-              </button>
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                disabled={loading || page >= totalPages - 1}
-                className="rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40"
-              >
-                →
-              </button>
-            </div>
-          </div>
+                Rafraîchir
+              </Button>
+            }
+          />
+        </motion.div>
 
-          {(error || success) && (
-            <div className="px-3 py-2 border-b border-slate-100">
-              {error && (
-                <div className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
-                  {error}
-                </div>
-              )}
-              {success && !error && (
-                <div className="rounded-md bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-                  {success}
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="overflow-x-auto">
-            {loading ? (
-              <div className="py-12">
-                <Spinner />
-              </div>
+        {(error || success) && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-lg p-md bg-danger-50 border border-danger-200 rounded-lg flex items-start gap-sm"
+          >
+            {error ? (
+              <>
+                <AlertCircle size={20} className="text-danger-600 flex-shrink-0 mt-xs" />
+                <p className="text-sm text-danger-900">{error}</p>
+              </>
             ) : (
-              <table className="min-w-[1180px] w-full border-collapse text-left">
-                <thead>
-                  <tr className={theadCls}>
-                    <th className="w-10 px-2 py-2.5 text-center">
-                      <input
-                        type="checkbox"
-                        className="h-3.5 w-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
-                        checked={allSelected}
-                        onChange={toggleSelectAll}
-                        aria-label="Tout sélectionner"
-                      />
-                    </th>
-                    <th className="px-3 py-2.5 min-w-[160px]">Collaborateur</th>
-                    {allTypeKeys.map((typeConge) => (
-                      <th
-                        key={typeConge}
-                        className="px-2 py-2.5 whitespace-nowrap"
-                      >
-                        {getTypeLabel(typeConge)}
-                      </th>
-                    ))}
-                    <th
-                      className="px-3 py-2.5 min-w-[140px]"
-                      title="Brouillon local — non enregistré sur le serveur"
-                    >
-                      Note
-                    </th>
-                    <th className="px-2 py-2.5 w-28 text-center"> </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={2 + allTypeKeys.length + 2}
-                        className="px-3 py-12 text-center text-sm text-slate-500"
-                      >
-                        Aucun résultat.
-                      </td>
-                    </tr>
-                  ) : (
-                    items.map((row) => {
-                      const rid = rowSelectableId(row);
-                      const saving = savingRowId === row?.user?.id;
-                      return (
-                        <tr
-                          key={rid}
-                          className="border-b border-slate-100 bg-white hover:bg-slate-50/80 transition-colors"
-                        >
-                          <td className="px-2 py-2.5 text-center align-middle">
-                            <input
-                              type="checkbox"
-                              className="h-3.5 w-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
-                              checked={selectedRows.has(rid)}
-                              onChange={() => toggleRowSelected(row)}
-                              aria-label={`Sélectionner ${formatUser(row?.user)}`}
-                            />
-                          </td>
-                          <td className="px-3 py-2.5 align-middle">
-                            <div className="flex items-center gap-2">
-                              <PersonGlyph />
-                              <div className="min-w-0">
-                                <div className="text-sm font-medium text-slate-900 truncate">
-                                  {formatUser(row?.user)}
-                                </div>
-                                <div className="text-[11px] text-slate-500 truncate">
-                                  {row?.user?.email}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          {allTypeKeys.map((typeConge) => {
-                            const line = findBalanceLine(row, typeConge);
-                            const empCountry = normalizeCountryIsoForHr(row?.user?.pays);
-                            const rttNotApplicable =
-                              (typeConge === "COURTE_DUREE" || typeConge === "SORTIE_COURTE") && empCountry !== "FR";
-                            const ro = rttNotApplicable || Boolean(line?.readOnly) || line == null;
-                            return (
-                              <td
-                                key={typeConge}
-                                className="px-2 py-2 align-middle"
-                              >
-                                <input
-                                  type="text"
-                                  inputMode="decimal"
-                                  value={cellInputValue(
-                                    row,
-                                    line,
-                                    typeConge,
-                                    rttNotApplicable,
-                                  )}
-                                  disabled={ro || saving}
-                                  onChange={(e) =>
-                                    onChangeRemaining(
-                                      row,
-                                      typeConge,
-                                      e.target.value,
-                                    )
-                                  }
-                                  className={inputCls(ro)}
-                                />
-                              </td>
-                            );
-                          })}
-                          <td className="px-3 py-2 align-middle">
-                            <textarea
-                              rows={2}
-                              value={notesByRow.get(noteKeyForRow(row)) ?? ""}
-                              onChange={(e) => {
-                                const k = noteKeyForRow(row);
-                                setNotesByRow((prev) => {
-                                  const next = new Map(prev);
-                                  next.set(k, e.target.value);
-                                  return next;
-                                });
-                              }}
-                              placeholder="Note…"
-                              className="w-full min-w-[120px] max-w-[220px] rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-violet-500 resize-y min-h-[2.25rem]"
-                            />
-                          </td>
-                          <td className="px-2 py-2 align-middle text-center">
-                            <button
-                              type="button"
-                              disabled={
-                                saving ||
-                                loading ||
-                                buildPayloadForRow(row) == null
-                              }
-                              onClick={() => saveRow(row)}
-                              className="rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm hover:bg-violet-700 disabled:opacity-40 disabled:hover:bg-violet-600 whitespace-nowrap"
-                            >
-                              {saving ? "…" : "Enregistrer"}
-                            </button>
+              <>
+                <CheckCircle2 size={20} className="text-success-600 flex-shrink-0 mt-xs" />
+                <p className="text-sm text-success-900">{success}</p>
+              </>
+            )}
+          </motion.div>
+        )}
+
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }}>
+          <Card variant="default">
+            <CardContent className="pt-lg">
+              {/* Search & Pagination Controls */}
+              <div className="mb-md flex flex-col sm:flex-row gap-md items-start sm:items-center">
+                <div className="flex-1 w-full sm:w-auto">
+                  <input
+                    type="text"
+                    value={q}
+                    onChange={(e) => {
+                      setQ(e.target.value);
+                      setPage(0);
+                    }}
+                    placeholder="Rechercher…"
+                    className="w-full px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                  />
+                </div>
+
+                <select
+                  value={size}
+                  onChange={(e) => {
+                    setSize(clamp(Number(e.target.value), 5, 50));
+                    setPage(0);
+                  }}
+                  className="px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                >
+                  <option value={5}>5 / page</option>
+                  <option value={10}>10 / page</option>
+                  <option value={20}>20 / page</option>
+                  <option value={50}>50 / page</option>
+                </select>
+
+                <div className="flex gap-sm">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    disabled={loading || page <= 0}
+                  >
+                    ←
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                    disabled={loading || page >= totalPages - 1}
+                  >
+                    →
+                  </Button>
+                </div>
+
+                <span className="text-xs text-neutral-600 whitespace-nowrap">
+                  Page <span className="font-semibold">{page + 1}</span> / {Math.max(1, totalPages || 1)}
+                </span>
+              </div>
+
+              {/* Table */}
+              <div className="overflow-x-auto border border-neutral-200 rounded-lg -mx-lg">
+                {loading ? (
+                  <div className="py-2xl flex justify-center">
+                    <Spinner size="lg" />
+                  </div>
+                ) : (
+                  <table className="min-w-full border-collapse text-left text-sm">
+                    <thead className="bg-neutral-50 border-b border-neutral-200">
+                      <tr>
+                        <th className="w-10 px-sm py-xs text-center">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                            checked={allSelected}
+                            onChange={toggleSelectAll}
+                            aria-label="Tout sélectionner"
+                          />
+                        </th>
+                        <th className="px-sm py-xs font-semibold text-neutral-900 min-w-[160px]">
+                          Collaborateur
+                        </th>
+                        {allTypeKeys.map((typeConge) => (
+                          <th
+                            key={typeConge}
+                            className="px-sm py-xs font-semibold text-neutral-900 whitespace-nowrap"
+                          >
+                            {getTypeLabel(typeConge)}
+                          </th>
+                        ))}
+                        <th className="px-sm py-xs font-semibold text-neutral-900 min-w-[140px]">
+                          Note
+                        </th>
+                        <th className="px-sm py-xs font-semibold text-neutral-900 w-24 text-center"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={2 + allTypeKeys.length + 2}
+                            className="px-sm py-md text-center text-sm text-neutral-500"
+                          >
+                            Aucun résultat.
                           </td>
                         </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            )}
-          </div>
+                      ) : (
+                        items.map((row) => {
+                          const rid = rowSelectableId(row);
+                          const saving = savingRowId === row?.user?.id;
+                          return (
+                            <tr
+                              key={rid}
+                              className="border-t border-neutral-200 bg-white hover:bg-neutral-50 transition-colors"
+                            >
+                              <td className="px-sm py-xs text-center">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                                  checked={selectedRows.has(rid)}
+                                  onChange={() => toggleRowSelected(row)}
+                                  aria-label={`Sélectionner ${formatUser(row?.user)}`}
+                                />
+                              </td>
+                              <td className="px-sm py-xs">
+                                <div className="flex items-center gap-sm">
+                                  <PersonGlyph className="w-4 h-4 text-neutral-400" />
+                                  <div className="min-w-0">
+                                    <p className="font-medium text-neutral-900 truncate">
+                                      {formatUser(row?.user)}
+                                    </p>
+                                    <p className="text-xs text-neutral-500 truncate">
+                                      {row?.user?.email}
+                                    </p>
+                                  </div>
+                                </div>
+                              </td>
+                              {allTypeKeys.map((typeConge) => {
+                                const line = findBalanceLine(row, typeConge);
+                                const empCountry = normalizeCountryIsoForHr(row?.user?.pays);
+                                const rttNotApplicable =
+                                  (typeConge === "COURTE_DUREE" || typeConge === "SORTIE_COURTE") && empCountry !== "FR";
+                                const ro = rttNotApplicable || Boolean(line?.readOnly) || line == null;
+                                return (
+                                  <td
+                                    key={typeConge}
+                                    className="px-sm py-xs"
+                                  >
+                                    <input
+                                      type="text"
+                                      inputMode="decimal"
+                                      value={cellInputValue(
+                                        row,
+                                        line,
+                                        typeConge,
+                                        rttNotApplicable,
+                                      )}
+                                      disabled={ro || saving}
+                                      onChange={(e) =>
+                                        onChangeRemaining(
+                                          row,
+                                          typeConge,
+                                          e.target.value,
+                                        )
+                                      }
+                                      className={inputCls(ro)}
+                                    />
+                                  </td>
+                                );
+                              })}
+                              <td className="px-sm py-xs">
+                                <textarea
+                                  rows={2}
+                                  value={notesByRow.get(noteKeyForRow(row)) ?? ""}
+                                  onChange={(e) => {
+                                    const k = noteKeyForRow(row);
+                                    setNotesByRow((prev) => {
+                                      const next = new Map(prev);
+                                      next.set(k, e.target.value);
+                                      return next;
+                                    });
+                                  }}
+                                  placeholder="Note…"
+                                  className="w-full min-w-[120px] rounded border border-neutral-300 bg-white px-sm py-xs text-xs text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-y"
+                                />
+                              </td>
+                              <td className="px-sm py-xs text-center">
+                                <Button
+                                  size="sm"
+                                  variant="primary"
+                                  disabled={
+                                    saving ||
+                                    loading ||
+                                    buildPayloadForRow(row) == null
+                                  }
+                                  onClick={() => saveRow(row)}
+                                  isLoading={saving}
+                                >
+                                  Enregistrer
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                )}
+              </div>
 
-          <div className="flex items-center justify-between border-t border-slate-100 px-3 py-2 text-[11px] text-slate-500">
-            <span>
-              Page{" "}
-              <span className="font-semibold text-slate-700">{page + 1}</span> /{" "}
-              {Math.max(1, totalPages || 1)}
-            </span>
-            <span>Total : {Number.isFinite(data?.total) ? data.total : 0}</span>
-          </div>
-        </div>
-      </div>
-    </div>
+              {/* Footer */}
+              <div className="mt-md text-xs text-neutral-600">
+                Total : {Number.isFinite(data?.total) ? data.total : 0}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </ContentWrapper>
+    </PageContainer>
   );
 }

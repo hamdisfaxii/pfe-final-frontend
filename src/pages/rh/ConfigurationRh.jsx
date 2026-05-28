@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import { AlertCircle, Plus, Trash2, Edit2, Check, X } from "lucide-react";
 import {
   createExceptionalLeave,
   deleteExceptionalLeave,
@@ -8,8 +10,16 @@ import {
   updateExceptionalLeave,
 } from "../../utils/rhApi";
 import { useAuth } from "../../context/authcontext";
-import Spinner from "../../components/commun/Spinner";
 import { HR_COUNTRY_LIST } from "../../utils/country";
+import {
+  PageContainer,
+  ContentWrapper,
+  PageHeader,
+  Button,
+  Card,
+  CardContent,
+  Spinner,
+} from "../../components/ui";
 
 const COUNTRIES = HR_COUNTRY_LIST;
 
@@ -340,417 +350,389 @@ export default function ConfigurationRh() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-6xl mx-auto px-6 py-10">
-        <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100 fade-in-up">
-          <h1 className="text-4xl font-bold text-sky-600">
-            Congés exceptionnels
-          </h1>
+    <PageContainer>
+      <ContentWrapper>
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+          <PageHeader
+            title="Configuration RH"
+            description="Gérez les congés exceptionnels et les horaires de travail"
+          />
+        </motion.div>
 
-          <div className="mt-6">
-            <button
-              type="button"
-              onClick={() => setShowAddForm((prev) => !prev)}
-              className="rounded-md bg-blue-700 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800 transition-all shadow-sm"
-            >
-              + Nouveau Congé Exceptionnel
-            </button>
-          </div>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }} className="mb-sm">
+          <Card variant="default">
+            <CardContent className="pt-sm">
+              <h2 className="text-lg font-semibold text-neutral-900 mb-sm">
+                Congés exceptionnels
+              </h2>
 
-          {showAddForm && (
-            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <input
-                  value={newLabel}
-                  onChange={(e) => setNewLabel(e.target.value)}
-                  placeholder="Libellé (ex: Mariage)"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <input
-                  type="number"
-                  min={0}
-                  value={newDays}
-                  onChange={(e) => setNewDays(e.target.value)}
-                  placeholder="Nbr jrs/an"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button
-                  type="button"
-                  onClick={handleCreate}
-                  disabled={saving}
-                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-all disabled:opacity-60"
+              <div className="mb-sm">
+                <Button
+                  variant="primary"
+                  icon={Plus}
+                  onClick={() => setShowAddForm((prev) => !prev)}
                 >
-                  Ajouter
-                </button>
+                  Nouveau Congé Exceptionnel
+                </Button>
               </div>
-            </div>
-          )}
 
-          <div className="mt-8 flex flex-wrap gap-2 border-b border-slate-200 pb-0">
-            {COUNTRIES.map((country) => {
-              const active = country.code === activeCountry;
-              return (
-                <button
-                  key={country.code}
-                  type="button"
-                  onClick={() => setActiveCountry(country.code)}
-                  className={`rounded-t-lg px-4 py-2 text-sm font-semibold transition-all ${
-                    active
-                      ? "bg-cyan-500 text-white shadow-sm"
-                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                  }`}
+              {showAddForm && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-sm p-sm bg-neutral-50 border border-neutral-200 rounded-lg"
                 >
-                  <span className="mr-2">{country.flag}</span>
-                  {country.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="mt-5 text-sm font-semibold text-slate-700">
-            {activeCountryInfo.flag} {activeCountryInfo.label}
-          </div>
-
-          {error && (
-            <div className="mt-4 rounded-xl border-l-4 border-red-500 bg-red-50 p-4 shadow-sm">
-              <div className="flex items-start gap-3">
-                <div className="text-red-500 mt-0.5">⚠️</div>
-                <div className="text-sm font-medium text-red-700">{error}</div>
-              </div>
-            </div>
-          )}
-
-          {loading ? (
-            <div className="mt-8">
-              <Spinner size={3} />
-            </div>
-          ) : (
-            <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
-              <table className="min-w-full text-sm">
-                <thead className="bg-slate-100 text-left text-slate-700 border-b border-slate-200">
-                  <tr>
-                    <th className="p-3 font-semibold text-slate-900">
-                      Libellé
-                    </th>
-                    <th className="p-3 font-semibold text-slate-900">
-                      Nbr jrs/an
-                    </th>
-                    <th className="p-3 font-semibold text-slate-900">
-                      Modifier
-                    </th>
-                    <th className="p-3 font-semibold text-slate-900">
-                      Appliquer
-                    </th>
-                    <th className="p-3 font-semibold text-slate-900">
-                      Supprimer
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr
-                      key={row.id}
-                      className="border-t border-slate-100 hover:bg-slate-50"
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-sm">
+                    <input
+                      type="text"
+                      value={newLabel}
+                      onChange={(e) => setNewLabel(e.target.value)}
+                      placeholder="Libellé (ex: Mariage)"
+                      className="px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      value={newDays}
+                      onChange={(e) => setNewDays(e.target.value)}
+                      placeholder="Nbr jrs/an"
+                      className="px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                    />
+                    <Button
+                      variant="success"
+                      onClick={handleCreate}
+                      disabled={saving}
+                      isLoading={saving}
                     >
-                      <td className="p-3 text-slate-700">{row.label}</td>
-                      <td className="p-3 text-slate-700">
-                        {editingId === row.id ? (
-                          <input
-                            type="number"
-                            min={0}
-                            value={editingDays}
-                            onChange={(e) => setEditingDays(e.target.value)}
-                            className="w-24 rounded-md border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        ) : (
-                          row.daysPerYear
-                        )}
-                      </td>
-                      <td className="p-3">
-                        {editingId === row.id ? (
-                          <button
-                            type="button"
-                            onClick={() => saveEditedDays(row)}
-                            disabled={saving}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-                            title="Sauvegarder"
-                          >
-                            ✓
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingId(row.id);
-                              setEditingDays(row.daysPerYear);
-                            }}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-cyan-100 text-cyan-700 hover:bg-cyan-200"
-                            title="Modifier"
-                          >
-                            ✎
-                          </button>
-                        )}
-                      </td>
-                      <td className="p-3">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(row.enabled)}
-                          onChange={() => handleToggleEnabled(row)}
-                          disabled={saving}
-                          className="h-4 w-4 accent-blue-600"
-                        />
-                      </td>
-                      <td className="p-3">
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(row)}
-                          disabled={saving}
-                          className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 transition-all disabled:opacity-60"
+                      Ajouter
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+
+              <div className="mb-sm flex gap-sm flex-wrap">
+                {COUNTRIES.map((country) => {
+                  const active = country.code === activeCountry;
+                  return (
+                    <Button
+                      key={country.code}
+                      size="sm"
+                      variant={active ? "primary" : "secondary"}
+                      onClick={() => setActiveCountry(country.code)}
+                    >
+                      <span className="mr-xs">{country.flag}</span>
+                      {country.label}
+                    </Button>
+                  );
+                })}
+              </div>
+
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-sm p-sm bg-danger-50 border border-danger-200 rounded-lg flex items-start gap-sm"
+                >
+                  <AlertCircle size={20} className="text-danger-600 flex-shrink-0 mt-xs" />
+                  <p className="text-sm text-danger-900">{error}</p>
+                </motion.div>
+              )}
+
+              {loading ? (
+                <div className="py-2xl flex justify-center">
+                  <Spinner size="lg" />
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-neutral-200 rounded-lg -mx-lg">
+                  <table className="w-full text-sm">
+                    <thead className="bg-neutral-50 border-b border-neutral-200">
+                      <tr>
+                        <th className="px-sm py-xs text-left font-semibold text-neutral-900">Libellé</th>
+                        <th className="px-sm py-xs text-left font-semibold text-neutral-900">Nbr jrs/an</th>
+                        <th className="px-sm py-xs text-left font-semibold text-neutral-900">Modifier</th>
+                        <th className="px-sm py-xs text-left font-semibold text-neutral-900">Actif</th>
+                        <th className="px-sm py-xs text-left font-semibold text-neutral-900">Supprimer</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row) => (
+                        <tr
+                          key={row.id}
+                          className="border-t border-neutral-200 hover:bg-neutral-50 transition-colors"
                         >
-                          Supprimer
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {rows.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={5}
-                        className="p-6 text-center text-slate-500"
-                      >
-                        Aucun congé exceptionnel configuré.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          <div className="mt-12 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-2xl font-bold text-sky-700">
-              Horaires de travail
-            </h2>
-
-            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="text-sm font-semibold text-slate-700">
-                  Type d'horaire actif :
-                </span>
-                <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    type="radio"
-                    name="activeSchedule"
-                    checked={pendingActiveType === "NORMAL"}
-                    onChange={() => queueScheduleActivation("NORMAL")}
-                    className="h-4 w-4 accent-blue-600"
-                  />
-                  <span>Normal</span>
-                </label>
-                <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    type="radio"
-                    name="activeSchedule"
-                    checked={pendingActiveType === "SUMMER"}
-                    onChange={() => queueScheduleActivation("SUMMER")}
-                    className="h-4 w-4 accent-blue-600"
-                  />
-                  <span>Été</span>
-                </label>
-                <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    type="radio"
-                    name="activeSchedule"
-                    checked={pendingActiveType === "RAMADAN"}
-                    onChange={() => queueScheduleActivation("RAMADAN")}
-                    className="h-4 w-4 accent-blue-600"
-                  />
-                  <span>Ramadan</span>
-                </label>
-                {pendingActiveType !== scheduleOptions.activeType && (
-                  <button
-                    type="button"
-                    onClick={confirmScheduleActivation}
-                    disabled={scheduleSaving}
-                    className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-all disabled:opacity-60"
-                  >
-                    Confirmer
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-4 border-b border-sky-300">
-              <div className="flex flex-wrap gap-2">
-                {SCHEDULE_TYPES.map((tab) => (
-                  <button
-                    key={tab.code}
-                    type="button"
-                    onClick={() => activateTab(tab.code)}
-                    className={`rounded-t-lg px-4 py-2 text-sm font-semibold ${
-                      scheduleType === tab.code
-                        ? "bg-blue-700 text-white"
-                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {scheduleError && (
-              <div className="mt-4 rounded-lg border-l-4 border-red-500 bg-red-50 p-3 text-sm text-red-700">
-                {scheduleError}
-              </div>
-            )}
-
-            {scheduleLoading ? (
-              <div className="mt-6">
-                <Spinner size={3} />
-              </div>
-            ) : (
-              <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-slate-100 border-b border-slate-200">
-                    <tr>
-                      <th className="p-3 text-left font-semibold text-slate-900" />
-                      <th className="p-3 text-left font-semibold text-slate-900">
-                        1ère séance
-                      </th>
-                      <th className="p-3 text-left font-semibold text-slate-900">
-                        2ème séance
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {DAYS.map((day) => {
-                      const row = scheduleRows.find(
-                        (r) => r.dayOfWeek === day.idx,
-                      ) || {
-                        firstStart: "",
-                        firstEnd: "",
-                        secondStart: "",
-                        secondEnd: "",
-                      };
-                      const firstEdit =
-                        editingCell?.dayOfWeek === day.idx &&
-                        editingCell?.session === 1;
-                      const secondEdit =
-                        editingCell?.dayOfWeek === day.idx &&
-                        editingCell?.session === 2;
-
-                      return (
-                        <tr key={day.idx} className="border-t border-slate-100">
-                          <td className="p-3 text-slate-700">{day.label}</td>
-                          <td className="p-3">
-                            <div className="flex items-center justify-between gap-3">
-                              {firstEdit ? (
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="time"
-                                    value={editingTimes.start}
-                                    onChange={(e) =>
-                                      setEditingTimes((p) => ({
-                                        ...p,
-                                        start: e.target.value,
-                                      }))
-                                    }
-                                    className="rounded border border-slate-300 px-2 py-1"
-                                  />
-                                  <span>-</span>
-                                  <input
-                                    type="time"
-                                    value={editingTimes.end}
-                                    onChange={(e) =>
-                                      setEditingTimes((p) => ({
-                                        ...p,
-                                        end: e.target.value,
-                                      }))
-                                    }
-                                    className="rounded border border-slate-300 px-2 py-1"
-                                  />
-                                </div>
-                              ) : (
-                                <span className="text-slate-600">
-                                  {row.firstStart && row.firstEnd
-                                    ? `${row.firstStart} - ${row.firstEnd}`
-                                    : "-"}
-                                </span>
-                              )}
-                              <button
-                                type="button"
-                                disabled={scheduleSaving}
-                                onClick={() =>
-                                  firstEdit
-                                    ? saveCell()
-                                    : openEditCell(day.idx, 1)
-                                }
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-cyan-100 text-cyan-700 hover:bg-cyan-200"
-                              >
-                                {firstEdit ? "✓" : "✎"}
-                              </button>
-                            </div>
+                          <td className="px-sm py-xs text-neutral-900">{row.label}</td>
+                          <td className="px-sm py-xs text-neutral-900">
+                            {editingId === row.id ? (
+                              <input
+                                type="number"
+                                min={0}
+                                value={editingDays}
+                                onChange={(e) => setEditingDays(e.target.value)}
+                                className="w-24 px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                              />
+                            ) : (
+                              row.daysPerYear
+                            )}
                           </td>
-                          <td className="p-3">
-                            <div className="flex items-center justify-between gap-3">
-                              {secondEdit ? (
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="time"
-                                    value={editingTimes.start}
-                                    onChange={(e) =>
-                                      setEditingTimes((p) => ({
-                                        ...p,
-                                        start: e.target.value,
-                                      }))
-                                    }
-                                    className="rounded border border-slate-300 px-2 py-1"
-                                  />
-                                  <span>-</span>
-                                  <input
-                                    type="time"
-                                    value={editingTimes.end}
-                                    onChange={(e) =>
-                                      setEditingTimes((p) => ({
-                                        ...p,
-                                        end: e.target.value,
-                                      }))
-                                    }
-                                    className="rounded border border-slate-300 px-2 py-1"
-                                  />
-                                </div>
-                              ) : (
-                                <span className="text-slate-600">
-                                  {row.secondStart && row.secondEnd
-                                    ? `${row.secondStart} - ${row.secondEnd}`
-                                    : "-"}
-                                </span>
-                              )}
-                              <button
-                                type="button"
-                                disabled={scheduleSaving}
-                                onClick={() =>
-                                  secondEdit
-                                    ? saveCell()
-                                    : openEditCell(day.idx, 2)
-                                }
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-cyan-100 text-cyan-700 hover:bg-cyan-200"
-                              >
-                                {secondEdit ? "✓" : "✎"}
-                              </button>
-                            </div>
+                          <td className="px-sm py-xs">
+                            {editingId === row.id ? (
+                              <Button
+                                size="sm"
+                                variant="success"
+                                icon={Check}
+                                onClick={() => saveEditedDays(row)}
+                                disabled={saving}
+                              />
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                icon={Edit2}
+                                onClick={() => {
+                                  setEditingId(row.id);
+                                  setEditingDays(row.daysPerYear);
+                                }}
+                              />
+                            )}
+                          </td>
+                          <td className="px-sm py-xs">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(row.enabled)}
+                              onChange={() => handleToggleEnabled(row)}
+                              disabled={saving}
+                              className="h-4 w-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                            />
+                          </td>
+                          <td className="px-sm py-xs">
+                            <Button
+                              size="sm"
+                              variant="danger"
+                              icon={Trash2}
+                              onClick={() => handleDelete(row)}
+                              disabled={saving}
+                            />
                           </td>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      ))}
+                      {rows.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="px-md py-lg text-center text-neutral-500">
+                            Aucun congé exceptionnel configuré.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }}>
+          <Card variant="default">
+            <CardContent className="pt-lg">
+              <h2 className="text-xl font-semibold text-neutral-900 mb-sm">
+                Horaires de travail
+              </h2>
+
+              {/* Active Schedule Type Selector */}
+              <div className="mb-sm p-sm bg-neutral-50 border border-neutral-200 rounded-lg">
+                <p className="text-sm font-semibold text-neutral-900 mb-md">Type d'horaire actif :</p>
+                <div className="flex flex-wrap items-center gap-sm mb-md">
+                  {["NORMAL", "SUMMER", "RAMADAN"].map((type) => (
+                    <label key={type} className="inline-flex items-center gap-xs text-sm text-neutral-900">
+                      <input
+                        type="radio"
+                        name="activeSchedule"
+                        checked={pendingActiveType === type}
+                        onChange={() => queueScheduleActivation(type)}
+                        className="h-4 w-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                      />
+                      <span>{type === "NORMAL" ? "Normal" : type === "SUMMER" ? "Été" : "Ramadan"}</span>
+                    </label>
+                  ))}
+                </div>
+                {pendingActiveType !== scheduleOptions.activeType && (
+                  <Button
+                    size="sm"
+                    variant="success"
+                    onClick={confirmScheduleActivation}
+                    disabled={scheduleSaving}
+                    isLoading={scheduleSaving}
+                  >
+                    Confirmer
+                  </Button>
+                )}
               </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+
+              {/* Schedule Type Tabs */}
+              <div className="mb-sm flex gap-sm flex-wrap">
+                {SCHEDULE_TYPES.map((tab) => (
+                  <Button
+                    key={tab.code}
+                    size="sm"
+                    variant={scheduleType === tab.code ? "primary" : "secondary"}
+                    onClick={() => activateTab(tab.code)}
+                  >
+                    {tab.label}
+                  </Button>
+                ))}
+              </div>
+
+              {scheduleError && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-sm p-sm bg-danger-50 border border-danger-200 rounded-lg flex items-start gap-sm"
+                >
+                  <AlertCircle size={20} className="text-danger-600 flex-shrink-0 mt-xs" />
+                  <p className="text-sm text-danger-900">{scheduleError}</p>
+                </motion.div>
+              )}
+
+              {scheduleLoading ? (
+                <div className="py-2xl flex justify-center">
+                  <Spinner size="lg" />
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-neutral-200 rounded-lg -mx-lg">
+                  <table className="w-full text-sm">
+                    <thead className="bg-neutral-50 border-b border-neutral-200">
+                      <tr>
+                        <th className="px-sm py-xs text-left font-semibold text-neutral-900">Jour</th>
+                        <th className="px-sm py-xs text-left font-semibold text-neutral-900">1ère séance</th>
+                        <th className="px-sm py-xs text-left font-semibold text-neutral-900">2ème séance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {DAYS.map((day) => {
+                        const row = scheduleRows.find(
+                          (r) => r.dayOfWeek === day.idx,
+                        ) || {
+                          firstStart: "",
+                          firstEnd: "",
+                          secondStart: "",
+                          secondEnd: "",
+                        };
+                        const firstEdit =
+                          editingCell?.dayOfWeek === day.idx &&
+                          editingCell?.session === 1;
+                        const secondEdit =
+                          editingCell?.dayOfWeek === day.idx &&
+                          editingCell?.session === 2;
+
+                        return (
+                          <tr key={day.idx} className="border-t border-neutral-200 hover:bg-neutral-50 transition-colors">
+                            <td className="px-sm py-xs font-medium text-neutral-900">{day.label}</td>
+                            <td className="px-sm py-xs">
+                              <div className="flex items-center justify-between gap-sm">
+                                {firstEdit ? (
+                                  <div className="flex items-center gap-sm">
+                                    <input
+                                      type="time"
+                                      value={editingTimes.start}
+                                      onChange={(e) =>
+                                        setEditingTimes((p) => ({
+                                          ...p,
+                                          start: e.target.value,
+                                        }))
+                                      }
+                                      className="px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                                    />
+                                    <span className="text-neutral-500">-</span>
+                                    <input
+                                      type="time"
+                                      value={editingTimes.end}
+                                      onChange={(e) =>
+                                        setEditingTimes((p) => ({
+                                          ...p,
+                                          end: e.target.value,
+                                        }))
+                                      }
+                                      className="px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                                    />
+                                  </div>
+                                ) : (
+                                  <span className="text-neutral-600">
+                                    {row.firstStart && row.firstEnd
+                                      ? `${row.firstStart} - ${row.firstEnd}`
+                                      : "-"}
+                                  </span>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  icon={firstEdit ? Check : Edit2}
+                                  disabled={scheduleSaving}
+                                  onClick={() =>
+                                    firstEdit
+                                      ? saveCell()
+                                      : openEditCell(day.idx, 1)
+                                  }
+                                />
+                              </div>
+                            </td>
+                            <td className="px-sm py-xs">
+                              <div className="flex items-center justify-between gap-sm">
+                                {secondEdit ? (
+                                  <div className="flex items-center gap-sm">
+                                    <input
+                                      type="time"
+                                      value={editingTimes.start}
+                                      onChange={(e) =>
+                                        setEditingTimes((p) => ({
+                                          ...p,
+                                          start: e.target.value,
+                                        }))
+                                      }
+                                      className="px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                                    />
+                                    <span className="text-neutral-500">-</span>
+                                    <input
+                                      type="time"
+                                      value={editingTimes.end}
+                                      onChange={(e) =>
+                                        setEditingTimes((p) => ({
+                                          ...p,
+                                          end: e.target.value,
+                                        }))
+                                      }
+                                      className="px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                                    />
+                                  </div>
+                                ) : (
+                                  <span className="text-neutral-600">
+                                    {row.secondStart && row.secondEnd
+                                      ? `${row.secondStart} - ${row.secondEnd}`
+                                      : "-"}
+                                  </span>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  icon={secondEdit ? Check : Edit2}
+                                  disabled={scheduleSaving}
+                                  onClick={() =>
+                                    secondEdit
+                                      ? saveCell()
+                                      : openEditCell(day.idx, 2)
+                                  }
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      </ContentWrapper>
+    </PageContainer>
   );
 }

@@ -1,11 +1,22 @@
 import React, { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { AlertCircle, ArrowLeft, Clock } from "lucide-react";
 import useDemandes from "../../hooks/useDemandes";
 import { useAuth } from "../../context/authcontext";
 import { isFranceSortieCourteEligible } from "../../utils/country";
 import { getActiveWorkSchedule, getSuperAdmins } from "../../utils/rhApi";
 import AIScoreCard from "../../components/AIScoreCard";
 import { normalizeScheduleCountry } from "../../utils/workSchedule";
+import {
+  PageContainer,
+  ContentWrapper,
+  PageHeader,
+  Button,
+  Card,
+  CardContent,
+  Spinner,
+} from "../../components/ui";
 
 const NON_FR_CAP = 2;
 const FIXED_MINUTES = 120;
@@ -238,311 +249,353 @@ export default function NouvelleSortieCourteDuree() {
     }
   };
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.05, delayChildren: 0.2 },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 10 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-3xl mx-auto px-6 py-10">
-        <div className="mb-8">
-          <button
-            type="button"
-            onClick={() => navigate("/employee/dashboard")}
-            className="text-sm font-semibold text-blue-600 hover:text-blue-700 transition-all"
-          >
-            &lt; Retour
-          </button>
-        </div>
+    <PageContainer>
+      <ContentWrapper>
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+          <PageHeader
+            title={fr ? "RTT (France)" : "Autorisation courte (2 h)"}
+            description={
+              fr
+                ? "Choisissez une journée complète ou une demi-journée"
+                : `Jusqu’à ${maxMois} autorisations de 2 h par mois calendaire`
+            }
+            action={
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={ArrowLeft}
+                onClick={() => navigate("/employee/dashboard")}
+              >
+                Retour
+              </Button>
+            }
+          />
+        </motion.div>
 
-        <h1 className="text-4xl font-bold text-slate-900">
-          {fr ? "RTT (France)" : "Autorisation courte (2 h)"}
-        </h1>
-
-        <p className="mt-3 text-slate-600">
-          {fr
-            ? "RTT : choisissez une journée complète ou une demi-journée."
-            : `Jusqu’à ${maxMois} autorisations de 2 h par mois calendaire (créées ou en attente). La ${maxMois + 1}ᵉ est refusée.`}
-        </p>
-
-        {scheduleError && (
-          <div className="mt-4 rounded-xl border-l-4 border-red-500 bg-red-50 p-4 text-sm text-red-700">
-            {scheduleError}
-          </div>
-        )}
-        {!scheduleError && scheduleLoading && (
-          <div className="mt-4 rounded-xl border-l-4 border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-            Chargement du planning RH actif...
-          </div>
-        )}
-        {!scheduleError && !scheduleLoading && activeSchedule && (
-          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-            <span className="font-semibold">Planning RH actif :</span>{" "}
-            {activeSchedule.activeType || "NORMAL"}
-          </div>
-        )}
-
-        <div
-          className={`mt-6 rounded-xl border px-5 py-4 ${
-            fr ? "border-violet-200 bg-violet-50" : "border-amber-200 bg-amber-50"
-          }`}
-        >
-          <div
-            className={`text-xs font-semibold uppercase tracking-wide ${
-              fr ? "text-violet-900" : "text-amber-900"
-            }`}
-          >
-            {fr ? "Solde RTT" : "Autorisations 2 h ce mois-ci"}
-          </div>
-
-          {fr ? (
-            soldeSummary?.franceRtt ? (
-              <div className="mt-3 grid grid-cols-4 gap-3 text-center">
-                <div>
-                  <div className="text-[10px] font-semibold text-violet-600 uppercase tracking-wide">Total</div>
-                  <div className="mt-0.5 text-lg font-bold text-violet-950">
-                    {formatRttJours(soldeSummary.franceRtt.total)}{" "}
-                    <span className="text-sm font-semibold text-slate-500">j</span>
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[10px] font-semibold text-violet-600 uppercase tracking-wide">Pris</div>
-                  <div className="mt-0.5 text-lg font-bold text-violet-950">
-                    {formatRttJours(soldeSummary.franceRtt.used)}{" "}
-                    <span className="text-sm font-semibold text-slate-500">j</span>
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[10px] font-semibold text-violet-600 uppercase tracking-wide">En attente</div>
-                  <div className="mt-0.5 text-lg font-bold text-violet-950">
-                    {formatRttJours(soldeSummary.franceRtt.pending)}{" "}
-                    <span className="text-sm font-semibold text-slate-500">j</span>
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wide">Restant</div>
-                  <div className="mt-0.5 text-xl font-bold text-emerald-700">
-                    {formatRttJours(soldeSummary.franceRtt.remaining)}{" "}
-                    <span className="text-sm font-semibold text-slate-500">j</span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="mt-1 text-xl font-bold text-violet-950">
-                {loading ? "…" : soldeSummary ? `${soldeSummary.permission} j` : "—"}
-              </div>
-            )
-          ) : (
-            <div className={`mt-1 text-xl font-bold ${restantes === 0 ? "text-red-700" : "text-amber-950"}`}>
-              {typeof utilisees === "number" && typeof restantes === "number" ? (
-                <>
-                  {utilisees} / {maxMois} utilisée(s) —{" "}
-                  <span className={restantes > 0 ? "text-emerald-700" : "text-red-600"}>
-                    {restantes} restante(s)
-                  </span>
-                </>
-              ) : loading ? (
-                <span className="text-sm font-medium text-amber-700">Chargement…</span>
-              ) : (
-                <span className="text-sm font-medium text-amber-700">Solde indisponible — actualisez la page.</span>
-              )}
+        {/* Schedule Status */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }} className="mb-lg">
+          {scheduleError && (
+            <div className="rounded-lg border border-danger-200 bg-danger-50 p-sm flex items-start gap-sm">
+              <AlertCircle size={20} className="text-danger-600 flex-shrink-0 mt-xs" />
+              <p className="text-sm text-danger-900">{scheduleError}</p>
             </div>
           )}
-        </div>
-
-        {(loading || submitting) && (
-          <div className="mt-4 text-sm font-medium text-slate-600">
-            Chargement...
-          </div>
-        )}
-        {error && (
-          <div className="mt-4 rounded-xl border-l-4 border-red-500 bg-red-50 p-4 shadow-sm">
-            <div className="flex items-start gap-3">
-              <div className="text-red-500 mt-0.5">⚠️</div>
-              <div className="text-sm font-medium text-red-700">{error}</div>
+          {!scheduleError && scheduleLoading && (
+            <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-sm">
+              <Spinner size="sm" />
+              <p className="text-sm text-neutral-600 mt-sm">Chargement du planning RH actif...</p>
             </div>
-          </div>
-        )}
-
-        <form
-          onSubmit={handleSubmit}
-          className="mt-8 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 fade-in-up"
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="sm:col-span-2">
-              <label className="text-sm font-semibold text-slate-700 block mb-2">
-                Approuvé par{" "}
-                {admins.length > 0 && <span className="text-red-500">*</span>}
-              </label>
-              <select
-                value={approvedByAdminId}
-                onChange={(e) => setApprovedByAdminId(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-4 py-2.5 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-              >
-                <option value="">
-                  {admins.length > 0
-                    ? "Sélectionner un Super Admin"
-                    : "Aucun validateur disponible"}
-                </option>
-                {admins.map((a) => (
-                  <option key={a.id ?? a.email ?? a.name} value={a.id}>
-                    {a.name || a.email || "Super Admin"}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-2 text-xs text-slate-500">
-                Ce champ est requis si la liste des Super Admins est disponible.
+          )}
+          {!scheduleError && !scheduleLoading && activeSchedule && (
+            <div className="rounded-lg border border-success-200 bg-success-50 p-sm">
+              <p className="text-sm text-success-900 font-medium">
+                Planning RH actif : {activeSchedule.activeType || "NORMAL"}
               </p>
             </div>
+          )}
+        </motion.div>
 
-            <div>
-              <label htmlFor="sortie-date-debut" className="text-sm font-semibold text-slate-700 block mb-2">
-                {fr ? "Date début" : "Date"}{" "}
-                <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="sortie-date-debut"
-                type="date"
-                value={dateDebut}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setDateDebut(v);
-                  if (!fr) return;
-                  setDateFin((prev) => (prev < v ? v : prev));
-                }}
-                className="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                required
-              />
-            </div>
+        {/* Balance Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.15 }}
+          className="mb-lg"
+        >
+          <Card variant={fr ? "primary" : "warning"}>
+            <CardContent className="pt-md">
+              <p className="text-xs font-semibold uppercase tracking-wide mb-md">
+                {fr ? "Solde RTT" : "Autorisations 2h ce mois-ci"}
+              </p>
 
-            {fr ? (
-              <div>
-                <label htmlFor="sortie-date-fin" className="text-sm font-semibold text-slate-700 block mb-2">
-                  Date fin <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="sortie-date-fin"
-                  type="date"
-                  value={dateFin}
-                  min={dateDebut}
-                  onChange={(e) => setDateFin(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  required
-                />
-              </div>
-            ) : null}
-
-            {fr ? (
-              <div className="sm:col-span-2">
-                <label htmlFor="sortie-periode" className="text-sm font-semibold text-slate-700 block mb-2">
-                  Période RTT
-                </label>
-                <select
-                  id="sortie-periode"
-                  value={periodeFr}
-                  onChange={(e) => setPeriodeFr(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg px-4 py-2.5 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  required
-                >
-                  <option value="">-- Sélectionner --</option>
-                  <option value="FULL_DAY">Journée complète</option>
-                  <option value="MORNING">Matin (0.5)</option>
-                  <option value="AFTERNOON">Après-midi (0.5)</option>
-                </select>
-              </div>
-            ) : (
-              <>
-                <div>
-                  <label htmlFor="sortie-heure-debut" className="text-sm font-semibold text-slate-700 block mb-2">
-                    Heure début <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="sortie-heure-debut"
-                    type="time"
-                    value={heureDebut}
-                    onChange={(e) => setHeureDebut(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="sortie-heure-fin" className="text-sm font-semibold text-slate-700 block mb-2">
-                    Heure fin <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="sortie-heure-fin"
-                    type="time"
-                    value={heureFin}
-                    readOnly
-                    className="w-full border border-slate-200 rounded-lg px-4 py-2.5 bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
-                  <p className="mt-1 text-xs text-slate-500">
-                    Calculée automatiquement : début + 2 h (règle métier).
+              {fr ? (
+                soldeSummary?.franceRtt ? (
+                  <div className="grid grid-cols-4 gap-sm text-center">
+                    <div>
+                      <p className="text-[10px] font-semibold opacity-75 uppercase tracking-wide mb-xs">Total</p>
+                      <p className="text-xl font-bold">
+                        {formatRttJours(soldeSummary.franceRtt.total)} <span className="text-sm font-semibold">j</span>
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold opacity-75 uppercase tracking-wide mb-xs">Pris</p>
+                      <p className="text-xl font-bold">
+                        {formatRttJours(soldeSummary.franceRtt.used)} <span className="text-sm font-semibold">j</span>
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold opacity-75 uppercase tracking-wide mb-xs">Attente</p>
+                      <p className="text-xl font-bold">
+                        {formatRttJours(soldeSummary.franceRtt.pending)} <span className="text-sm font-semibold">j</span>
+                      </p>
+                    </div>
+                    <div className="bg-primary-100/50 rounded-lg p-sm">
+                      <p className="text-[10px] font-semibold opacity-75 uppercase tracking-wide mb-xs">Restant</p>
+                      <p className="text-xl font-bold text-primary-600">
+                        {formatRttJours(soldeSummary.franceRtt.remaining)} <span className="text-sm font-semibold">j</span>
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-lg font-bold">
+                    {loading ? "…" : soldeSummary ? `${soldeSummary.permission} j` : "—"}
                   </p>
+                )
+              ) : (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-lg font-bold">
+                      {typeof utilisees === "number" && typeof restantes === "number" ? (
+                        <>
+                          {utilisees} / {maxMois} utilisée(s)
+                        </>
+                      ) : loading ? (
+                        "Chargement…"
+                      ) : (
+                        "Indisponible"
+                      )}
+                    </p>
+                    {typeof restantes === "number" && (
+                      <p className={`text-sm font-semibold mt-xs ${restantes > 0 ? "text-success-600" : "text-danger-600"}`}>
+                        {restantes} restante(s)
+                      </p>
+                    )}
+                  </div>
+                  <Clock size={20} className="opacity-25" />
                 </div>
-              </>
-            )}
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
 
-            <div className="sm:col-span-2">
-              <label htmlFor="sortie-motif" className="text-sm font-semibold text-slate-700 block mb-2">
-                Motif <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                id="sortie-motif"
-                value={motif}
-                onChange={(e) => setMotif(e.target.value)}
-                className="w-full min-h-[120px] resize-y border border-slate-200 rounded-lg px-4 py-2.5 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                placeholder={
-                  fr
-                    ? "Ex. RTT journée, départ anticipé, etc."
-                    : "Ex. autorisation 2 h, motif du déplacement…"
-                }
-                required
-              />
-            </div>
-          </div>
+        {/* Error States */}
+        {(loading || submitting) && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-md">
+            <Spinner size="sm" />
+          </motion.div>
+        )}
 
-          {formError && (
-            <div className="mt-6 rounded-xl border-l-4 border-red-500 bg-red-50 p-4 shadow-sm">
-              <div className="flex items-start gap-3">
-                <div className="text-red-500 mt-0.5">⚠️</div>
-                <div className="text-sm font-medium text-red-700">
-                  {formError}
-                </div>
-              </div>
-            </div>
-          )}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-lg p-sm bg-danger-50 border border-danger-200 rounded-lg flex items-start gap-sm"
+          >
+            <AlertCircle size={20} className="text-danger-600 flex-shrink-0 mt-xs" />
+            <p className="text-sm text-danger-900">{error}</p>
+          </motion.div>
+        )}
 
-          {dateDebut && (
-            <AIScoreCard
-              demandeData={{
-                titre: fr ? "RTT" : "Sortie courte durée",
-                dateDebut,
-                dateFin: dateDebut,
-                heureDebut,
-                heureFin,
-                commentaire: motif,
-                typeConge: "SORTIE_COURTE",
-              }}
-              userId={user?.id}
-              isLoading={loading}
-            />
-          )}
+        {/* Form */}
+        <motion.div variants={containerVariants} initial="hidden" animate="visible">
+          <Card variant="default">
+            <CardContent className="pt-lg">
+              <form onSubmit={handleSubmit} className="space-y-md">
+                {/* Approver */}
+                <motion.div variants={itemVariants}>
+                  <label htmlFor="sortie-approver" className="block text-sm font-semibold text-neutral-900 mb-xs">
+                    Approuvé par {admins.length > 0 && <span className="text-danger-600">*</span>}
+                  </label>
+                  <select
+                    id="sortie-approver"
+                    value={approvedByAdminId}
+                    onChange={(e) => setApprovedByAdminId(e.target.value)}
+                    className="w-full px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                  >
+                    <option value="">
+                      {admins.length > 0
+                        ? "Sélectionner un Super Admin"
+                        : "Aucun validateur disponible"}
+                    </option>
+                    {admins.map((a) => (
+                      <option key={a.id ?? a.email ?? a.name} value={a.id}>
+                        {a.name || a.email || "Super Admin"}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-neutral-500 mt-xs">
+                    Ce champ est requis si la liste des Super Admins est disponible.
+                  </p>
+                </motion.div>
 
-          <div className="mt-8 flex gap-4 justify-end">
-            <button
-              type="button"
-              onClick={() => navigate("/employee/dashboard")}
-              className="px-6 py-3 rounded-lg bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition-all"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              Envoyer
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+                {/* Dates */}
+                <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 gap-sm">
+                  <div>
+                    <label htmlFor="sortie-date-debut" className="block text-sm font-semibold text-neutral-900 mb-xs">
+                      {fr ? "Date début" : "Date"} <span className="text-danger-600">*</span>
+                    </label>
+                    <input
+                      id="sortie-date-debut"
+                      type="date"
+                      value={dateDebut}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setDateDebut(v);
+                        if (!fr) return;
+                        setDateFin((prev) => (prev < v ? v : prev));
+                      }}
+                      className="w-full px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                      required
+                    />
+                  </div>
+
+                  {fr && (
+                    <div>
+                      <label htmlFor="sortie-date-fin" className="block text-sm font-semibold text-neutral-900 mb-xs">
+                        Date fin <span className="text-danger-600">*</span>
+                      </label>
+                      <input
+                        id="sortie-date-fin"
+                        type="date"
+                        value={dateFin}
+                        min={dateDebut}
+                        onChange={(e) => setDateFin(e.target.value)}
+                        className="w-full px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                        required
+                      />
+                    </div>
+                  )}
+                </motion.div>
+
+                {/* Period / Hours */}
+                {fr ? (
+                  <motion.div variants={itemVariants}>
+                    <label htmlFor="sortie-periode" className="block text-sm font-semibold text-neutral-900 mb-xs">
+                      Période RTT
+                    </label>
+                    <select
+                      id="sortie-periode"
+                      value={periodeFr}
+                      onChange={(e) => setPeriodeFr(e.target.value)}
+                      className="w-full px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                      required
+                    >
+                      <option value="">Sélectionner...</option>
+                      <option value="FULL_DAY">Journée complète</option>
+                      <option value="MORNING">Matin (0.5)</option>
+                      <option value="AFTERNOON">Après-midi (0.5)</option>
+                    </select>
+                  </motion.div>
+                ) : (
+                  <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 gap-sm">
+                    <div>
+                      <label htmlFor="sortie-heure-debut" className="block text-sm font-semibold text-neutral-900 mb-xs">
+                        Heure début <span className="text-danger-600">*</span>
+                      </label>
+                      <input
+                        id="sortie-heure-debut"
+                        type="time"
+                        value={heureDebut}
+                        onChange={(e) => setHeureDebut(e.target.value)}
+                        className="w-full px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="sortie-heure-fin" className="block text-sm font-semibold text-neutral-900 mb-xs">
+                        Heure fin <span className="text-danger-600">*</span>
+                      </label>
+                      <input
+                        id="sortie-heure-fin"
+                        type="time"
+                        value={heureFin}
+                        readOnly
+                        className="w-full px-sm py-xs rounded-lg border border-neutral-300 bg-neutral-50 text-neutral-600 text-sm cursor-not-allowed"
+                      />
+                      <p className="text-xs text-neutral-500 mt-xs">
+                        Auto : début + 2h
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Reason */}
+                <motion.div variants={itemVariants}>
+                  <label htmlFor="sortie-motif" className="block text-sm font-semibold text-neutral-900 mb-xs">
+                    Motif <span className="text-danger-600">*</span>
+                  </label>
+                  <textarea
+                    id="sortie-motif"
+                    value={motif}
+                    onChange={(e) => setMotif(e.target.value)}
+                    className="w-full px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm min-h-24 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-none"
+                    placeholder={
+                      fr
+                        ? "Justification du RTT..."
+                        : "Motif de l’autorisation courte..."
+                    }
+                    required
+                  />
+                </motion.div>
+
+                {/* Form Error */}
+                {formError && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-sm bg-danger-50 border border-danger-200 rounded-lg flex items-start gap-sm"
+                  >
+                    <AlertCircle size={20} className="text-danger-600 flex-shrink-0 mt-xs" />
+                    <p className="text-sm text-danger-900">{formError}</p>
+                  </motion.div>
+                )}
+
+                {/* AI Score Card */}
+                {dateDebut && (
+                  <motion.div variants={itemVariants}>
+                    <AIScoreCard
+                      demandeData={{
+                        titre: fr ? "RTT" : "Sortie courte durée",
+                        dateDebut,
+                        dateFin: dateDebut,
+                        heureDebut,
+                        heureFin,
+                        commentaire: motif,
+                        typeConge: "SORTIE_COURTE",
+                      }}
+                      userId={user?.id}
+                      isLoading={loading}
+                    />
+                  </motion.div>
+                )}
+
+                {/* Actions */}
+                <motion.div variants={itemVariants} className="flex gap-sm justify-end pt-md border-t border-neutral-200">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => navigate("/employee/dashboard")}
+                  >
+                    Annuler
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    isLoading={submitting}
+                    disabled={submitting}
+                  >
+                    Envoyer
+                  </Button>
+                </motion.div>
+              </form>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </ContentWrapper>
+    </PageContainer>
   );
 }

@@ -1,9 +1,21 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { AlertCircle, CheckCircle2, XCircle, Eye } from "lucide-react";
 import api from "../../utils/api";
 import { useAuth } from "../../context/authcontext";
-import Spinner from "../../components/commun/Spinner";
 import { libelleAffichageTypeConge } from "../../utils/country";
+import {
+  PageContainer,
+  ContentWrapper,
+  PageHeader,
+  Button,
+  Card,
+  CardContent,
+  StatusBadge,
+  Spinner,
+  Modal,
+} from "../../components/ui";
 
 const formatStatus = (raw) => {
   const s = String(raw ?? "").trim().toUpperCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
@@ -11,20 +23,6 @@ const formatStatus = (raw) => {
   if (s.includes("ACCEPTE") || s.includes("APPROUVE") || s.includes("APPROVED")) return "APPROVED";
   if (s.includes("REFUSE") || s.includes("REJET") || s.includes("REJECTED")) return "REJECTED";
   return s || "UNKNOWN";
-};
-
-const statusBadgeClass = (status) => {
-  if (status === "PENDING")  return "bg-amber-100 text-amber-800";
-  if (status === "APPROVED") return "bg-emerald-100 text-emerald-800";
-  if (status === "REJECTED") return "bg-red-100 text-red-800";
-  return "bg-slate-100 text-slate-700";
-};
-
-const statusLabel = (status) => {
-  if (status === "PENDING")  return "EN ATTENTE";
-  if (status === "APPROVED") return "APPROUVÉ";
-  if (status === "REJECTED") return "REJETÉ";
-  return status;
 };
 
 export default function DecisionModule() {
@@ -39,7 +37,7 @@ export default function DecisionModule() {
   });
 
   const [modal, setModal] = useState({
-    open: false, requestId: null, action: "APPROVE", comment: "", commentError: "",
+    isOpen: false, requestId: null, action: "APPROVE", comment: "", commentError: "",
   });
 
   const fetchPending = useCallback(async () => {
@@ -55,7 +53,7 @@ export default function DecisionModule() {
 
       const { data } = await api.get("/rh/requests/pending", { params });
       setRequests(Array.isArray(data) ? data : []);
-    } catch (e) {
+    } catch {
       setError("Impossible de charger les demandes en attente.");
     } finally {
       setLoading(false);
@@ -63,7 +61,7 @@ export default function DecisionModule() {
   }, [filters]);
 
   const closeModal = () =>
-    setModal({ open: false, requestId: null, action: "APPROVE", comment: "", commentError: "" });
+    setModal({ isOpen: false, requestId: null, action: "APPROVE", comment: "", commentError: "" });
 
   const activeRequest = requests.find((row) => String(row.id) === String(modal.requestId));
 
@@ -82,199 +80,302 @@ export default function DecisionModule() {
       });
       closeModal();
       await fetchPending();
-    } catch (e) {
+    } catch {
       setError("Échec de la mise à jour de la demande.");
     } finally {
       setLoading(false);
     }
   }, [fetchPending, modal.action, modal.comment, modal.requestId]);
 
-  const title = useMemo(() => `Décisions RH - ${user?.name || "Responsable RH"}`, [user?.name]);
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.05, delayChildren: 0.1 },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 10 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 py-10">
-        <h1 className="text-4xl font-bold text-slate-900 fade-in-up">{title}</h1>
-        <p className="mt-3 text-sm text-slate-600 fade-in-up" style={{ animationDelay: "0.05s" }}>
-          Gérez les demandes en attente, appliquez les décisions et synchronisez le workflow.
-        </p>
-
-        <div className="mt-6 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm fade-in-up">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
-            <input value={filters.employee}
-              onChange={(e) => setFilters((prev) => ({ ...prev, employee: e.target.value }))}
-              placeholder="Employé (nom/email)"
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            <input value={filters.country}
-              onChange={(e) => setFilters((prev) => ({ ...prev, country: e.target.value }))}
-              placeholder="Pays (TN/MA/FR)"
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            <input value={filters.department}
-              onChange={(e) => setFilters((prev) => ({ ...prev, department: e.target.value }))}
-              placeholder="Département"
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            <input type="date" value={filters.startDate}
-              onChange={(e) => setFilters((prev) => ({ ...prev, startDate: e.target.value }))}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            <input type="date" value={filters.endDate}
-              onChange={(e) => setFilters((prev) => ({ ...prev, endDate: e.target.value }))}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <div className="mt-4 flex gap-3">
-            <button type="button" onClick={fetchPending} disabled={loading}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 hover:shadow-lg transition-all">
-              Charger les demandes en attente
-            </button>
-            <button type="button"
-              onClick={() => { setFilters({ employee: "", country: "", department: "", startDate: "", endDate: "" }); setRequests([]); }}
-              className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition-all">
-              Réinitialiser
-            </button>
-          </div>
-        </div>
+    <PageContainer>
+      <ContentWrapper>
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+          <PageHeader
+            title="Module de décision"
+            description="Traitez les demandes en attente et appliquez vos décisions"
+          />
+        </motion.div>
 
         {error && (
-          <div className="mt-4 rounded-xl border-l-4 border-red-500 bg-red-50 p-4 shadow-sm">
-            <div className="flex items-start gap-3">
-              <div className="text-red-500 mt-0.5">⚠️</div>
-              <div className="text-sm font-medium text-red-700">{error}</div>
-            </div>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-lg p-md bg-danger-50 border border-danger-200 rounded-lg flex items-start gap-sm"
+          >
+            <AlertCircle size={20} className="text-danger-600 flex-shrink-0 mt-xs" />
+            <p className="text-sm text-danger-900">{error}</p>
+          </motion.div>
         )}
 
-        {loading && requests.length === 0 ? (
-          <div className="mt-8"><Spinner size={3} /></div>
-        ) : (
-          <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-100 bg-white shadow-sm fade-in-up">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 text-left text-slate-700 border-b border-slate-200">
-                <tr>
-                  <th className="p-4 font-semibold text-slate-900">Employé</th>
-                  <th className="p-4 font-semibold text-slate-900">Pays / Département</th>
-                  <th className="p-4 font-semibold text-slate-900">Type / Période</th>
-                  <th className="p-4 font-semibold text-slate-900">Motif</th>
-                  <th className="p-4 font-semibold text-slate-900">Statut</th>
-                  <th className="p-4 font-semibold text-slate-900">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading && (
-                  <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-500">Chargement...</td></tr>
-                )}
-                {!loading && requests.length === 0 && (
-                  <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-500">Aucune demande en attente.</td></tr>
-                )}
-                {!loading && requests.map((req) => {
-                  const status = formatStatus(req.statut);
-                  return (
-                    <tr key={req.id} className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
-                      <td className="p-4">
-                        <div className="font-semibold text-slate-900">{req.employe?.prenom} {req.employe?.nom}</div>
-                        <div className="text-xs text-slate-500">{req.employe?.email}</div>
-                      </td>
-                      <td className="p-4 text-slate-700">{(req.employe?.country || "-") + " / " + (req.employe?.department || "-")}</td>
-                      <td className="p-4 text-slate-700">
-                        <div>{libelleAffichageTypeConge(req.typeConge, req.employe?.country)}</div>
-                        <div className="text-xs text-slate-500">{req.dateDebut} → {req.dateFin}</div>
-                      </td>
-                      <td className="p-4 text-slate-700">{req.motif || "-"}</td>
-                      <td className="p-4">
-                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusBadgeClass(status)}`}>
-                          {statusLabel(status)}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex flex-wrap gap-2">
-                          <button type="button"
-                            className="rounded-lg bg-slate-600 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-700 hover:shadow-lg transition-all"
-                            onClick={() => navigate(`/rh/requests/${req.id}`)}>
-                            Détails
-                          </button>
-                          <button type="button"
-                            className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 hover:shadow-lg transition-all"
-                            onClick={() => setModal({ open: true, requestId: req.id, action: "APPROVE", comment: "" })}>
-                            Approuver
-                          </button>
-                          <button type="button"
-                            className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700 hover:shadow-lg transition-all"
-                            onClick={() => setModal({ open: true, requestId: req.id, action: "REJECT", comment: "" })}>
-                            Rejeter
-                          </button>
-                        </div>
-                      </td>
+        {/* Filters */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }}>
+          <Card variant="default">
+            <CardContent className="pt-lg">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-md mb-md">
+                <input
+                  type="text"
+                  value={filters.employee}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, employee: e.target.value }))}
+                  placeholder="Employé (nom/email)"
+                  className="px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                />
+                <input
+                  type="text"
+                  value={filters.country}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, country: e.target.value }))}
+                  placeholder="Pays (TN/MA/FR)"
+                  className="px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                />
+                <input
+                  type="text"
+                  value={filters.department}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, department: e.target.value }))}
+                  placeholder="Département"
+                  className="px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                />
+                <input
+                  type="date"
+                  value={filters.startDate}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, startDate: e.target.value }))}
+                  className="px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                />
+                <input
+                  type="date"
+                  value={filters.endDate}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, endDate: e.target.value }))}
+                  className="px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                />
+              </div>
+
+              <div className="flex gap-md flex-wrap">
+                <Button variant="primary" onClick={fetchPending} disabled={loading} isLoading={loading}>
+                  Charger les demandes
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setFilters({ employee: "", country: "", department: "", startDate: "", endDate: "" });
+                    setRequests([]);
+                  }}
+                >
+                  Réinitialiser
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Requests Table */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.15 }} className="mt-lg">
+          {loading && requests.length === 0 ? (
+            <div className="flex justify-center py-2xl">
+              <Spinner size="lg" />
+            </div>
+          ) : requests.length === 0 ? (
+            <Card variant="default">
+              <div className="text-center py-2xl">
+                <AlertCircle size={48} className="mx-auto mb-md text-neutral-400" />
+                <p className="text-neutral-600 font-medium">Aucune demande en attente.</p>
+              </div>
+            </Card>
+          ) : (
+            <Card variant="default">
+              <CardContent className="pt-0 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-neutral-50 border-b border-neutral-200">
+                    <tr>
+                      <th className="text-left p-sm font-semibold text-neutral-900">Employé</th>
+                      <th className="text-left p-sm font-semibold text-neutral-900">Pays / Département</th>
+                      <th className="text-left p-sm font-semibold text-neutral-900">Type / Période</th>
+                      <th className="text-left p-sm font-semibold text-neutral-900">Motif</th>
+                      <th className="text-left p-sm font-semibold text-neutral-900">Statut</th>
+                      <th className="text-left p-sm font-semibold text-neutral-900">Actions</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                  </thead>
+                  <tbody>
+                    {requests.map((req) => {
+                      const status = formatStatus(req.statut);
+                      return (
+                        <tr key={req.id} className="border-t border-neutral-200 hover:bg-neutral-50 transition-colors">
+                          <td className="p-sm">
+                            <p className="font-semibold text-neutral-900">{req.employe?.prenom} {req.employe?.nom}</p>
+                            <p className="text-xs text-neutral-500">{req.employe?.email}</p>
+                          </td>
+                          <td className="p-sm text-neutral-700">
+                            {(req.employe?.country || "-") + " / " + (req.employe?.department || "-")}
+                          </td>
+                          <td className="p-sm text-neutral-700">
+                            <p>{libelleAffichageTypeConge(req.typeConge, req.employe?.country)}</p>
+                            <p className="text-xs text-neutral-500">{req.dateDebut} → {req.dateFin}</p>
+                          </td>
+                          <td className="p-sm text-neutral-700">{req.motif || "-"}</td>
+                          <td className="p-sm">
+                            <StatusBadge statut={status} />
+                          </td>
+                          <td className="p-sm">
+                            <div className="flex gap-sm flex-wrap">
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                icon={Eye}
+                                onClick={() => navigate(`/rh/requests/${req.id}`)}
+                              >
+                                Détails
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="success"
+                                icon={CheckCircle2}
+                                onClick={() => setModal({
+                                  isOpen: true,
+                                  requestId: req.id,
+                                  action: "APPROVE",
+                                  comment: "",
+                                  commentError: "",
+                                })}
+                              >
+                                Approuver
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="danger"
+                                icon={XCircle}
+                                onClick={() => setModal({
+                                  isOpen: true,
+                                  requestId: req.id,
+                                  action: "REJECT",
+                                  comment: "",
+                                  commentError: "",
+                                })}
+                              >
+                                Rejeter
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          )}
+        </motion.div>
+      </ContentWrapper>
 
-      {modal.open && (
-        <div className="fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/50" role="presentation" onClick={closeModal} />
-          <div className="relative z-10 flex h-full items-center justify-center p-4">
-            <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
-              <h3 className="text-xl font-bold text-slate-900">
-                {modal.action === "APPROVE" ? "Approuver la demande" : "Rejeter la demande"}
-              </h3>
-              <p className="mt-2 text-sm text-slate-600">Vérifiez les informations avant de décider.</p>
-
-              {activeRequest && (
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <div className="text-xs uppercase text-slate-500">Employé</div>
-                      <div className="font-semibold text-slate-900">{activeRequest.employe?.prenom} {activeRequest.employe?.nom}</div>
-                      <div className="text-xs text-slate-500">{activeRequest.employe?.email}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs uppercase text-slate-500">Pays / Département</div>
-                      <div className="text-slate-900">{(activeRequest.employe?.country || "-") + " / " + (activeRequest.employe?.department || "-")}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs uppercase text-slate-500">Type</div>
-                      <div className="text-slate-900">{libelleAffichageTypeConge(activeRequest.typeConge, activeRequest.employe?.country)}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs uppercase text-slate-500">Période</div>
-                      <div className="text-slate-900">{activeRequest.dateDebut} → {activeRequest.dateFin}</div>
-                    </div>
-                    <div className="sm:col-span-2">
-                      <div className="text-xs uppercase text-slate-500">Motif</div>
-                      <div className="text-slate-900">{activeRequest.motif || "-"}</div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-4">
-                <label className="text-xs font-semibold text-slate-700">
-                  {modal.action === "REJECT" ? (<>Motif de rejet <span className="text-red-500">*</span></>) : "Commentaire (optionnel)"}
-                </label>
-                <textarea value={modal.comment}
-                  onChange={(e) => setModal((prev) => ({ ...prev, comment: e.target.value, commentError: "" }))}
-                  className={`mt-1 min-h-[120px] w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${modal.commentError ? "border-red-400 bg-red-50" : "border-slate-200"}`}
-                  placeholder={modal.action === "REJECT" ? "Saisissez le motif de rejet (obligatoire)" : "Commentaire (optionnel)"} />
-                {modal.commentError && (
-                  <p className="mt-1 text-xs font-medium text-red-600">{modal.commentError}</p>
-                )}
+      {/* Decision Modal */}
+      <Modal
+        isOpen={modal.isOpen}
+        onClose={closeModal}
+        title={modal.action === "APPROVE" ? "Approuver la demande" : "Rejeter la demande"}
+        description="Vérifiez les informations avant de décider."
+      >
+        {activeRequest && (
+          <div className="mt-lg mb-lg rounded-lg border border-neutral-200 bg-neutral-50 p-md">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-md">
+              <div>
+                <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-xs">
+                  Employé
+                </p>
+                <p className="font-semibold text-neutral-900">{activeRequest.employe?.prenom} {activeRequest.employe?.nom}</p>
+                <p className="text-xs text-neutral-500">{activeRequest.employe?.email}</p>
               </div>
-              <div className="mt-6 flex justify-end gap-3">
-                <button type="button" onClick={closeModal}
-                  className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200">
-                  Annuler
-                </button>
-                <button type="button" onClick={submitDecision} disabled={loading}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-70">
-                  Confirmer
-                </button>
+
+              <div>
+                <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-xs">
+                  Pays / Département
+                </p>
+                <p className="text-neutral-900">
+                  {(activeRequest.employe?.country || "-") + " / " + (activeRequest.employe?.department || "-")}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-xs">
+                  Type
+                </p>
+                <p className="text-neutral-900">
+                  {libelleAffichageTypeConge(activeRequest.typeConge, activeRequest.employe?.country)}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-xs">
+                  Période
+                </p>
+                <p className="text-neutral-900">{activeRequest.dateDebut} → {activeRequest.dateFin}</p>
+              </div>
+
+              <div className="md:col-span-2">
+                <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-xs">
+                  Motif
+                </p>
+                <p className="text-neutral-900">{activeRequest.motif || "-"}</p>
               </div>
             </div>
           </div>
+        )}
+
+        <div className="mb-lg">
+          <label htmlFor="decision-comment" className="block text-sm font-semibold text-neutral-900 mb-xs">
+            {modal.action === "REJECT" ? (
+              <>
+                Motif de rejet <span className="text-danger-600">*</span>
+              </>
+            ) : (
+              "Commentaire (optionnel)"
+            )}
+          </label>
+          <textarea
+            id="decision-comment"
+            value={modal.comment}
+            onChange={(e) => setModal((prev) => ({ ...prev, comment: e.target.value, commentError: "" }))}
+            className={`w-full px-sm py-xs rounded-lg border bg-white text-neutral-900 text-sm min-h-24 focus:outline-none focus:ring-2 focus:border-transparent transition-all resize-none ${
+              modal.commentError
+                ? "border-danger-300 focus:ring-danger-500 bg-danger-50"
+                : "border-neutral-300 focus:ring-primary-500"
+            }`}
+            placeholder={
+              modal.action === "REJECT"
+                ? "Saisissez le motif de rejet (obligatoire)"
+                : "Commentaire (optionnel)"
+            }
+          />
+          {modal.commentError && (
+            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-xs text-xs font-medium text-danger-600">
+              {modal.commentError}
+            </motion.p>
+          )}
         </div>
-      )}
-    </div>
+
+        <div className="flex gap-md justify-end">
+          <Button variant="secondary" onClick={closeModal}>
+            Annuler
+          </Button>
+          <Button
+            variant={modal.action === "APPROVE" ? "success" : "danger"}
+            onClick={submitDecision}
+            disabled={loading}
+            isLoading={loading}
+          >
+            Confirmer
+          </Button>
+        </div>
+      </Modal>
+    </PageContainer>
   );
 }

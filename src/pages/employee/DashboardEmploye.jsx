@@ -1,30 +1,47 @@
 import React, { useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import {
+  Calendar,
+  Clock,
+  Gift,
+  AlertCircle,
+  ChevronRight,
+  RefreshCw,
+  FileText,
+} from "lucide-react";
 import useDemandes from "../../hooks/useDemandes";
-import SoldeConge from "../../components/employee/SoldeConge";
-import CarteAction from "../../components/employee/CarteAction";
-import StatutBadge from "../../components/employee/StatutBadge";
-import Spinner from "../../components/commun/Spinner";
 import { useAuth } from "../../context/authcontext";
-import { formaterDate } from "../../utils/calculJours";
+import { formaterDate, calculerJoursOuvres } from "../../utils/calculJours";
 import {
   isFranceSortieCourteEligible,
   libelleAffichageTypeConge,
   metaForCountry,
 } from "../../utils/country";
+import {
+  PageContainer,
+  ContentWrapper,
+  PageHeader,
+  Grid,
+  Stack,
+  StatCard,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+  Button,
+  StatusBadge,
+  Spinner,
+  showToast,
+} from "../../components/ui";
 
 export default function DashboardEmploye() {
   const { user } = useAuth();
-  const {
-    solde,
-    soldeSummary,
-    demandes,
-    loading,
-    error,
-    fetchSolde,
-    fetchDemandes,
-  } = useDemandes();
   const navigate = useNavigate();
+  const { solde, soldeSummary, demandes, loading, error, fetchSolde, fetchDemandes } =
+    useDemandes();
   const paysMeta = metaForCountry(user?.country);
 
   const reloadAll = useCallback(() => {
@@ -45,220 +62,259 @@ export default function DashboardEmploye() {
   }, [reloadAll]);
 
   const recentDemandes = demandes.slice(0, 5);
+  const congesPayes = soldeSummary?.congesPayes || 0;
+  const maladie = soldeSummary?.maladie || 0;
+
+  const actionCards = [
+    {
+      icon: Calendar,
+      title: "Nouveau congé",
+      description: "Créer une demande de congé payé",
+      action: () => navigate("/employee/conge/new"),
+      color: "primary",
+    },
+    {
+      icon: Clock,
+      title: isFranceSortieCourteEligible(user?.country) ? "RTT" : "Autorisation courte",
+      description: isFranceSortieCourteEligible(user?.country)
+        ? "Demande de RTT"
+        : "Jusqu'à 2h par mois",
+      action: () => navigate("/employee/sortie/new"),
+      color: "success",
+    },
+    {
+      icon: Gift,
+      title: "Congés exceptionnels",
+      description: "Mariage, naissance, décès…",
+      action: () => navigate("/employee/exceptionnels"),
+      color: "warning",
+    },
+    {
+      icon: AlertCircle,
+      title: "Déclaration de retard",
+      description: "Signaler une arrivée tardive",
+      action: () => navigate("/employee/retard/new"),
+      color: "danger",
+    },
+  ];
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.2,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.4, ease: "easeOut" },
+    },
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-6xl mx-auto px-6 py-10">
-        <h1 className="text-4xl font-bold text-slate-900 animate-fadeIn">
-          Bienvenue dans votre espace privé
-        </h1>
-        {user && (
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-600">
-            <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 shadow-sm">
-              <span className="text-lg" aria-hidden>
-                {paysMeta.flag}
-              </span>
-              <span className="font-semibold text-slate-900">
-                {paysMeta.label}
-              </span>
-              <span className="text-xs text-slate-500 uppercase tracking-wide">
-                ({user.country || "—"})
-              </span>
-            </span>
-            {user.departement ? (
-              <span className="text-slate-500">
-                Service :{" "}
-                <strong className="text-slate-800">{user.departement}</strong>
-              </span>
-            ) : null}
-          </div>
+    <PageContainer>
+      <ContentWrapper>
+        {/* Header */}
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+          <PageHeader
+            title={`Bienvenue, ${user?.firstName || "Collaborateur"}`}
+            description={`Gérez vos congés facilement • ${paysMeta.label}`}
+            action={
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={RefreshCw}
+                onClick={reloadAll}
+                disabled={loading}
+              >
+                Actualiser
+              </Button>
+            }
+          />
+        </motion.div>
+
+        {/* Error Banner */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-lg p-sm bg-danger-50 border border-danger-200 rounded-lg flex gap-sm items-start"
+          >
+            <AlertCircle className="text-danger-600 flex-shrink-0 mt-1" size={20} />
+            <div>
+              <p className="font-semibold text-danger-900">{error}</p>
+            </div>
+          </motion.div>
         )}
 
-        {/* Solde */}
-        <div className="mt-8">
-          <div className="mb-3 flex justify-end">
-            <button
-              type="button"
-              onClick={reloadAll}
-              disabled={loading}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-all"
-            >
-              {loading ? "Chargement…" : "Actualiser"}
-            </button>
-          </div>
-          {loading && soldeSummary == null ? (
-            <Spinner />
+        {/* Soldes de congés */}
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="mb-2xl"
+        >
+          <h2 className="text-xl font-semibold text-neutral-900 mb-md">Vos soldes de congés</h2>
+
+          {loading && !soldeSummary ? (
+            <Spinner size="lg" />
           ) : (
-            <SoldeConge
-              soldeSummary={soldeSummary}
-              solde={solde}
-              employeeCountry={user?.country}
-            />
+            <Grid columns={3} gap="md">
+              <motion.div variants={itemVariants}>
+                <StatCard
+                  label="Congés payés"
+                  value={Math.round(congesPayes * 10) / 10}
+                  subValue="jours"
+                  variant="primary"
+                  icon={Calendar}
+                />
+              </motion.div>
+
+              <motion.div variants={itemVariants}>
+                <StatCard
+                  label="Congé maladie"
+                  value={Math.round(maladie * 10) / 10}
+                  subValue="jours"
+                  variant="warning"
+                  icon={AlertCircle}
+                />
+              </motion.div>
+
+              {isFranceSortieCourteEligible(user?.country) && (
+                <motion.div variants={itemVariants}>
+                  <StatCard
+                    label="RTT"
+                    value={
+                      soldeSummary?.franceRtt?.remaining
+                        ? Math.round(soldeSummary.franceRtt.remaining * 10) / 10
+                        : 0
+                    }
+                    subValue="jours"
+                    variant="success"
+                    icon={Clock}
+                  />
+                </motion.div>
+              )}
+            </Grid>
           )}
-          {error && (
-            <div className="mt-4 rounded-xl border-l-4 border-red-500 bg-red-50 p-4 shadow-sm">
-              <div className="flex items-start gap-3">
-                <div className="text-red-500 mt-0.5">⚠️</div>
-                <div className="text-sm font-medium text-red-700">{error}</div>
-              </div>
-            </div>
-          )}
-        </div>
+        </motion.div>
 
         {/* Actions rapides */}
-        <div className="mt-10 flex flex-wrap justify-center gap-6">
-          <div className="w-full sm:w-80">
-            <CarteAction
-              titre="Je demande un congé"
-              description="Créez une nouvelle demande de congé en quelques secondes."
-              boutonTexte="Nouvelle demande"
-              icone={<div className="text-2xl">📅</div>}
-              onClick={() => navigate("/employee/conge/new")}
-            />
-          </div>
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="mb-2xl"
+        >
+          <h2 className="text-xl font-semibold text-neutral-900 mb-md">Actions rapides</h2>
 
-          <div className="w-full sm:w-80">
-            <CarteAction
-              titre="Congés exceptionnels"
-              description="Mariage, naissance, décès… Consultez vos droits et faites une demande."
-              boutonTexte="Voir / Demander"
-              icone={<div className="text-2xl">🎯</div>}
-              onClick={() => navigate("/employee/exceptionnels")}
-            />
-          </div>
+          <Grid columns={4} gap="md">
+            {actionCards.map((item, index) => {
+              const Icon = item.icon;
+              const colorMap = {
+                primary: "primary",
+                success: "success",
+                warning: "warning",
+                danger: "danger",
+              };
 
-          <div className="w-full sm:w-80">
-            <CarteAction
-              titre={
-                isFranceSortieCourteEligible(user?.country)
-                  ? "RTT (France)"
-                  : "Autorisation courte (2 h)"
-              }
-              description={
-                isFranceSortieCourteEligible(user?.country)
-                  ? "RTT en jours ouvrés ou plage horaire : uniquement sur cet écran, pas sur la demande de congé classique."
-                  : "Jusqu'à 2 autorisations de 2 h par mois (types : rendez-vous, urgence, autorisation)."
-              }
-              boutonTexte="Faire une demande"
-              icone={<div className="text-2xl">⏰</div>}
-              onClick={() => navigate("/employee/sortie/new")}
-            />
-          </div>
-          <div className="w-full sm:w-80">
-            <CarteAction
-              titre="J'arrive en retard"
-              description="Soumettez votre demande de retard selon vos horaires."
-              boutonTexte="Faire une demande"
-              icone={<div className="text-2xl">⏳</div>}
-              onClick={() => navigate("/employee/retard/new")}
-            />
-          </div>
-        </div>
+              return (
+                <motion.div key={index} variants={itemVariants}>
+                  <Card
+                    variant={colorMap[item.color]}
+                    interactive
+                    onClick={item.action}
+                    className="cursor-pointer h-full hover:border-current hover:border-opacity-50"
+                  >
+                    <div className="flex flex-col h-full">
+                      <div
+                        className={`inline-flex p-sm rounded-lg w-fit mb-sm opacity-75`}
+                      >
+                        <Icon size={20} />
+                      </div>
+                      <h3 className="font-semibold text-neutral-900 mb-xs">{item.title}</h3>
+                      <p className="text-sm text-neutral-600 text-opacity-80 flex-1 mb-md">
+                        {item.description}
+                      </p>
+                      <div className="flex items-center text-sm font-semibold gap-1 opacity-75">
+                        Accéder
+                        <ChevronRight size={16} />
+                      </div>
+                    </div>
+                  </Card>
+                </motion.div>
+              );
+            })}
+          </Grid>
+        </motion.div>
 
         {/* Demandes récentes */}
-        <div className="mt-10">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-bold text-slate-900">
-              Demandes récentes
-            </h2>
-            <button
-              type="button"
-              onClick={() => navigate("/employee/historique?statut=tous")}
-              className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-all"
-            >
-              Voir tout →
-            </button>
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          <div className="flex items-center justify-between mb-md">
+            <h2 className="text-xl font-semibold text-neutral-900">Demandes récentes</h2>
+            <Button variant="ghost" onClick={() => navigate("/employee/historique")}>
+              Voir tout
+              <ChevronRight size={16} />
+            </Button>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white shadow-sm fade-in-up">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr className="text-left">
-                  <th className="p-4 font-semibold text-slate-900">Type</th>
-                  <th className="p-4 font-semibold text-slate-900">Début</th>
-                  <th className="p-4 font-semibold text-slate-900">Fin</th>
-                  <th className="p-4 font-semibold text-slate-900">Jours</th>
-                  <th className="p-4 font-semibold text-slate-900">État</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading && demandes.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="p-6 text-center text-slate-500">
-                      Chargement…
-                    </td>
-                  </tr>
-                ) : recentDemandes.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="p-6 text-center text-slate-500">
-                      Aucune demande pour le moment.
-                    </td>
-                  </tr>
-                ) : (
-                  recentDemandes.map((demande) => {
-                    const id =
-                      demande?.id ?? demande?._id ?? demande?.ID;
-                    const etat = demande?.statut ?? demande?.status;
-                    const jours =
-                      demande?.nbJours ??
-                      demande?.nombreJours ??
-                      demande?.jours ??
-                      demande?.nb_days;
-                    const titre = demande?.titre ?? demande?.type;
-
-                    return (
-                      <tr
-                        key={id}
-                        className="border-t border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors"
-                        onClick={() => navigate(`/employee/demande/${id}`)}
-                      >
-                        <td className="p-4 text-slate-700">
-                          {titre
-                            ? libelleAffichageTypeConge(titre, user?.country ?? user?.pays)
-                            : "—"}
-                        </td>
-                        <td className="p-4 text-slate-700">
-                          {formaterDate(
-                            demande?.dateDebut ?? demande?.debut,
-                          )}
-                        </td>
-                        <td className="p-4 text-slate-700">
-                          {formaterDate(demande?.dateFin ?? demande?.fin)}
-                        </td>
-                        <td className="p-4 text-slate-700">
-                          {typeof jours === "number" ? jours : "—"}
-                        </td>
-                        <td className="p-4">
-                          <StatutBadge statut={etat} />
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="mt-3 flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() =>
-                navigate("/employee/historique?statut=attente")
-              }
-              className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition-all"
-            >
-              Demandes en cours
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/employee/historique?statut=tous")}
-              className="rounded-lg bg-slate-800 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-900 transition-all"
-            >
-              Historique complet
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+          {recentDemandes.length === 0 ? (
+            <Card variant="ghost">
+              <div className="text-center py-lg">
+                <FileText className="mx-auto mb-md text-neutral-400" size={48} />
+                <p className="text-neutral-600">Aucune demande pour l'instant</p>
+              </div>
+            </Card>
+          ) : (
+            <div className="space-y-md">
+              {recentDemandes.map((demande) => (
+                <motion.div key={demande.id} variants={itemVariants}>
+                  <Card
+                    interactive
+                    onClick={() => navigate(`/employee/demande/${demande.id}`)}
+                    className="cursor-pointer"
+                  >
+                    <div className="flex items-start justify-between gap-sm">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-sm mb-xs">
+                          <h4 className="font-semibold text-neutral-900">
+                            {libelleAffichageTypeConge(demande.typeConge, user?.country)}
+                          </h4>
+                          <StatusBadge status={demande.statut} size="xs" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-sm text-sm text-neutral-600">
+                          <div>
+                            <p className="text-xs text-neutral-500">Période</p>
+                            <p className="font-medium text-neutral-900">
+                              {formaterDate(demande.dateDebut)} → {formaterDate(demande.dateFin)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-neutral-500">Durée</p>
+                            <p className="font-medium text-neutral-900">{demande.nombreJours} jour(s)</p>
+                          </div>
+                        </div>
+                      </div>
+                      <ChevronRight className="text-neutral-400 flex-shrink-0" size={20} />
+                    </div>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </motion.div>
+      </ContentWrapper>
+    </PageContainer>
   );
 }

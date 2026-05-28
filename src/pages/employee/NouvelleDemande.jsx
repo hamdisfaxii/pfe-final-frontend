@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { AlertCircle, ArrowLeft, Upload } from "lucide-react";
 import useDemandes from "../../hooks/useDemandes";
 import { calculerJoursOuvres } from "../../utils/calculJours";
 import { useAuth } from "../../context/authcontext";
@@ -13,6 +15,17 @@ import {
   scheduleRowHasAnySession,
 } from "../../utils/workSchedule";
 import { normalizeCountryIsoForHr } from "../../utils/country";
+import {
+  PageContainer,
+  ContentWrapper,
+  PageHeader,
+  Button,
+  Card,
+  CardContent,
+  Input,
+  Spinner,
+  showToast,
+} from "../../components/ui";
 
 export default function NouvelleDemande() {
   const navigate = useNavigate();
@@ -237,268 +250,333 @@ export default function NouvelleDemande() {
     }
   };
 
-  const fld =
-    "w-full border border-slate-200 rounded-md px-2.5 py-1.5 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all";
-  const lbl = "text-xs font-semibold text-slate-700 block mb-1";
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.05, delayChildren: 0.2 },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 10 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-2xl mx-auto px-4 py-5 sm:px-5 sm:py-6">
-        <div className="mb-4">
-          <button
-            type="button"
-            onClick={() => navigate("/employee/dashboard")}
-            className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-all"
-          >
-            &lt; Retour
-          </button>
-        </div>
+    <PageContainer>
+      <ContentWrapper>
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+          <PageHeader
+            title="Nouvelle demande de congé"
+            description="Remplissez le formulaire pour soumettre votre demande"
+            action={
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={ArrowLeft}
+                onClick={() => navigate("/employee/dashboard")}
+              >
+                Retour
+              </Button>
+            }
+          />
+        </motion.div>
 
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-          Nouvelle demande de congé
-        </h1>
-
-        {scheduleError ? (
-          <div className="mt-4 rounded-xl border-l-4 border-red-500 bg-red-50 p-3 text-sm text-red-700">
-            {scheduleError}
-          </div>
-        ) : scheduleLoading ? (
-          <div className="mt-4 rounded-xl border-l-4 border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-            Chargement du planning RH actif...
-          </div>
-        ) : activeSchedule ? (
-          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-            Planning RH actif : {activeSchedule.activeType || "NORMAL"}
-          </div>
-        ) : null}
-
-        <div className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-md ring-1 ring-slate-900/5 fade-in-up">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-            Utilisateur
-          </div>
-          <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span className="text-base font-semibold text-slate-900">
-              {[user?.prenom, user?.nom].filter(Boolean).join(" ").trim() ||
-                user?.email ||
-                "—"}
-            </span>
-            {user?.email ? (
-              <span className="text-xs text-slate-500 truncate max-w-full">
-                {user.email}
-              </span>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="mt-3">
-          <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2.5 fade-in-up">
-            <div className="text-[10px] font-semibold text-blue-900 uppercase tracking-wide">
-              Solde disponible
+        {/* Schedule Status */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }} className="mb-lg">
+          {scheduleError ? (
+            <div className="rounded-lg border border-danger-200 bg-danger-50 p-sm flex items-start gap-sm">
+              <AlertCircle size={20} className="text-danger-600 flex-shrink-0 mt-xs" />
+              <p className="text-sm text-danger-900">{scheduleError}</p>
             </div>
-            <div className="mt-0.5 text-lg font-bold text-blue-900 tabular-nums">
-              {typeof soldeCongesPayes === "number"
-                ? `${soldeCongesPayes} jours`
-                : "—"}
+          ) : scheduleLoading ? (
+            <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-sm">
+              <Spinner size="sm" />
+              <p className="text-sm text-neutral-600 mt-sm">Chargement du planning RH actif...</p>
             </div>
-          </div>
-        </div>
-
-        {(loading || submitting) && (
-          <div className="mt-2 text-xs font-medium text-slate-600">
-            Chargement...
-          </div>
-        )}
-        {error && (
-          <div className="mt-3 rounded-lg border-l-4 border-red-500 bg-red-50 p-3 shadow-sm">
-            <div className="flex items-start gap-2">
-              <div className="text-red-500 text-sm mt-0.5">⚠️</div>
-              <div className="text-xs font-medium text-red-700">{error}</div>
+          ) : activeSchedule ? (
+            <div className="rounded-lg border border-success-200 bg-success-50 p-sm">
+              <p className="text-sm text-success-900 font-medium">
+                Planning RH actif : {activeSchedule.activeType || "NORMAL"}
+              </p>
             </div>
-          </div>
-        )}
+          ) : null}
+        </motion.div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="mt-5 bg-white rounded-xl shadow-sm border border-slate-100 p-4 sm:p-5 fade-in-up"
+        {/* User Info and Balance */}
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="mb-lg grid grid-cols-1 md:grid-cols-2 gap-sm"
         >
-          <div className="flex flex-col gap-3.5">
-            <div>
-              <label className={lbl}>Type</label>
-              <select
-                value={titre}
-                onChange={(e) => setTitre(e.target.value)}
-                className={fld}
-                required
-              >
-                <option value="Congé payé">Congé payé</option>
-                <option value="Congé sans solde">Sans solde</option>
-                {normalizeCountryIsoForHr(user?.country ?? user?.pays) === "TN" && (
-                  <option value="Congé maladie">Maladie</option>
-                )}
-              </select>
-            </div>
-
-            <div>
-              <label className={lbl}>Date début</label>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
-                <input
-                  type="date"
-                  value={dateDebut}
-                  onChange={(e) => setDateDebut(e.target.value)}
-                  className={`${fld} sm:flex-1 min-w-[9rem]`}
-                  required
-                />
-                <select
-                  value={startHalfDay}
-                  onChange={(e) => setStartHalfDay(e.target.value)}
-                  className={`${fld} sm:w-36 shrink-0`}
-                  aria-label="Période début (matin ou après-midi)"
-                >
-                  <option value="">Journée complète</option>
-                  <option value="MORNING">Matin</option>
-                  <option value="AFTERNOON">Après-midi</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className={lbl}>Date fin</label>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
-                <input
-                  type="date"
-                  value={dateFin}
-                  onChange={(e) => setDateFin(e.target.value)}
-                  className={`${fld} sm:flex-1 min-w-[9rem]`}
-                  required
-                />
-                <select
-                  value={endHalfDay}
-                  onChange={(e) => setEndHalfDay(e.target.value)}
-                  className={`${fld} sm:w-36 shrink-0`}
-                  aria-label="Période fin (matin ou après-midi)"
-                >
-                  <option value="">Journée complète</option>
-                  <option value="MORNING">Matin</option>
-                  <option value="AFTERNOON">Après-midi</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className={lbl}>Nombre de jours (ouvrés)</label>
-              <input
-                type="text"
-                value={nbJours}
-                readOnly
-                className={`${fld} bg-slate-50 font-medium tabular-nums`}
-              />
-            </div>
-
-            <div>
-              <label className={lbl}>
-                Sera approuvé par{" "}
-                {admins.length > 0 && <span className="text-red-500">*</span>}
-              </label>
-              <select
-                value={approvedByAdminId}
-                onChange={(e) => setApprovedByAdminId(e.target.value)}
-                className={fld}
-              >
-                <option value="">
-                  {admins.length > 0
-                    ? "Sélectionner un validateur"
-                    : "Aucun validateur disponible"}
-                </option>
-                {admins.map((a) => (
-                  <option key={a.id ?? a.email ?? a.name} value={a.id}>
-                    {a.name || a.email || "Super Admin"}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className={lbl}>Description</label>
-              <textarea
-                value={commentaire}
-                onChange={(e) => setCommentaire(e.target.value)}
-                className={`${fld} min-h-[96px] resize-y`}
-              />
-            </div>
-
-            {titre === "Congé maladie" && (
-              <div>
-                <label className={lbl}>
-                  Justificatif médical{" "}
-                  <span className="text-slate-400 font-normal">(optionnel)</span>
-                </label>
-                <input
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png,.heic"
-                  onChange={(e) => setPieceJointe(e.target.files?.[0] ?? null)}
-                  className="w-full text-sm text-slate-700 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-                />
-                {pieceJointe && (
-                  <p className="mt-1 text-xs text-emerald-700 font-medium">
-                    Fichier sélectionné : {pieceJointe.name}
+          <motion.div variants={itemVariants}>
+            <Card variant="default">
+              <CardContent className="pt-md">
+                <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-sm">
+                  Utilisateur
+                </p>
+                <p className="text-base font-semibold text-neutral-900 mb-xs">
+                  {[user?.prenom, user?.nom].filter(Boolean).join(" ").trim() || user?.email || "—"}
+                </p>
+                {user?.email && (
+                  <p className="text-xs text-neutral-500 truncate">
+                    {user.email}
                   </p>
                 )}
-                <p className="mt-1 text-xs text-slate-500">
-                  Formats acceptés : PDF, JPG, PNG, HEIC — 10 Mo max.
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div variants={itemVariants}>
+            <Card variant="primary">
+              <CardContent className="pt-md">
+                <p className="text-xs font-semibold text-primary-700 uppercase tracking-wide mb-sm">
+                  Solde disponible
                 </p>
-              </div>
-            )}
-          </div>
+                <p className="text-2xl font-bold text-primary-900 tabular-nums">
+                  {typeof soldeCongesPayes === "number"
+                    ? `${soldeCongesPayes} jours`
+                    : "—"}
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
 
-          {formError && (
-            <div className="mt-4 rounded-lg border-l-4 border-red-500 bg-red-50 p-3 shadow-sm">
-              <div className="flex items-start gap-2">
-                <div className="text-red-500 text-sm mt-0.5">⚠️</div>
-                <div className="text-xs font-medium text-red-700">
-                  {formError}
-                </div>
-              </div>
-            </div>
-          )}
+        {/* Loading/Error States */}
+        {(loading || submitting) && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-md">
+            <Spinner size="sm" />
+          </motion.div>
+        )}
 
-          {dateDebut && dateFin && (
-            <AIScoreCard
-              demandeData={{
-                titre,
-                dateDebut,
-                dateFin,
-                startHalfDay,
-                endHalfDay,
-                commentaire,
-                typeConge: titre.toLowerCase().includes("maladie")
-                  ? "CONGE_MALADIE"
-                  : titre.toLowerCase().includes("sans solde")
-                    ? "CONGE_SANS_SOLDE"
-                    : "CONGES_PAYES",
-              }}
-              userId={user?.id}
-              isLoading={loading}
-            />
-          )}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-lg p-sm bg-danger-50 border border-danger-200 rounded-lg flex items-start gap-sm"
+          >
+            <AlertCircle size={20} className="text-danger-600 flex-shrink-0 mt-xs" />
+            <p className="text-sm text-danger-900">{error}</p>
+          </motion.div>
+        )}
 
-          <div className="mt-5 flex gap-2 justify-end">
-            <button
-              type="button"
-              onClick={() => navigate("/employee/dashboard")}
-              className="px-4 py-2 rounded-md text-sm bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition-all"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-4 py-2 rounded-md text-sm bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              Ajouter
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        {/* Form */}
+        <motion.div variants={containerVariants} initial="hidden" animate="visible">
+          <Card variant="default">
+            <CardContent className="pt-lg">
+              <form onSubmit={handleSubmit} className="space-y-md">
+                {/* Type */}
+                <motion.div variants={itemVariants}>
+                  <label className="block text-sm font-semibold text-neutral-900 mb-xs">
+                    Type de congé <span className="text-danger-600">*</span>
+                  </label>
+                  <select
+                    value={titre}
+                    onChange={(e) => setTitre(e.target.value)}
+                    className="w-full px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                    required
+                  >
+                    <option value="Congé payé">Congé payé</option>
+                    <option value="Congé sans solde">Sans solde</option>
+                    {normalizeCountryIsoForHr(user?.country ?? user?.pays) === "TN" && (
+                      <option value="Congé maladie">Maladie</option>
+                    )}
+                  </select>
+                </motion.div>
+
+                {/* Start Date */}
+                <motion.div variants={itemVariants}>
+                  <label className="block text-sm font-semibold text-neutral-900 mb-xs">
+                    Date début <span className="text-danger-600">*</span>
+                  </label>
+                  <div className="flex flex-col md:flex-row gap-sm">
+                    <input
+                      type="date"
+                      value={dateDebut}
+                      onChange={(e) => setDateDebut(e.target.value)}
+                      className="flex-1 px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                      required
+                    />
+                    <select
+                      value={startHalfDay}
+                      onChange={(e) => setStartHalfDay(e.target.value)}
+                      className="md:w-40 px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                      aria-label="Période début (matin ou après-midi)"
+                    >
+                      <option value="">Journée complète</option>
+                      <option value="MORNING">Matin</option>
+                      <option value="AFTERNOON">Après-midi</option>
+                    </select>
+                  </div>
+                </motion.div>
+
+                {/* End Date */}
+                <motion.div variants={itemVariants}>
+                  <label className="block text-sm font-semibold text-neutral-900 mb-xs">
+                    Date fin <span className="text-danger-600">*</span>
+                  </label>
+                  <div className="flex flex-col md:flex-row gap-sm">
+                    <input
+                      type="date"
+                      value={dateFin}
+                      onChange={(e) => setDateFin(e.target.value)}
+                      className="flex-1 px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                      required
+                    />
+                    <select
+                      value={endHalfDay}
+                      onChange={(e) => setEndHalfDay(e.target.value)}
+                      className="md:w-40 px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                      aria-label="Période fin (matin ou après-midi)"
+                    >
+                      <option value="">Journée complète</option>
+                      <option value="MORNING">Matin</option>
+                      <option value="AFTERNOON">Après-midi</option>
+                    </select>
+                  </div>
+                </motion.div>
+
+                {/* Duration */}
+                <motion.div variants={itemVariants}>
+                  <label className="block text-sm font-semibold text-neutral-900 mb-xs">
+                    Nombre de jours (ouvrés)
+                  </label>
+                  <input
+                    type="text"
+                    value={nbJours}
+                    readOnly
+                    className="w-full px-sm py-xs rounded-lg border border-neutral-300 bg-neutral-50 text-neutral-900 text-sm font-medium tabular-nums cursor-not-allowed"
+                  />
+                </motion.div>
+
+                {/* Approver */}
+                <motion.div variants={itemVariants}>
+                  <label className="block text-sm font-semibold text-neutral-900 mb-xs">
+                    Sera approuvé par {admins.length > 0 && <span className="text-danger-600">*</span>}
+                  </label>
+                  <select
+                    value={approvedByAdminId}
+                    onChange={(e) => setApprovedByAdminId(e.target.value)}
+                    className="w-full px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                  >
+                    <option value="">
+                      {admins.length > 0
+                        ? "Sélectionner un validateur"
+                        : "Aucun validateur disponible"}
+                    </option>
+                    {admins.map((a) => (
+                      <option key={a.id ?? a.email ?? a.name} value={a.id}>
+                        {a.name || a.email || "Super Admin"}
+                      </option>
+                    ))}
+                  </select>
+                </motion.div>
+
+                {/* Description */}
+                <motion.div variants={itemVariants}>
+                  <label className="block text-sm font-semibold text-neutral-900 mb-xs">
+                    Description
+                  </label>
+                  <textarea
+                    value={commentaire}
+                    onChange={(e) => setCommentaire(e.target.value)}
+                    className="w-full px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm min-h-24 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-none"
+                    placeholder="Ajoutez une description ou commentaire..."
+                  />
+                </motion.div>
+
+                {/* Medical Attachment */}
+                {titre === "Congé maladie" && (
+                  <motion.div variants={itemVariants}>
+                    <label className="block text-sm font-semibold text-neutral-900 mb-xs">
+                      Justificatif médical <span className="text-neutral-500 font-normal text-xs">(optionnel)</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.heic"
+                        onChange={(e) => setPieceJointe(e.target.files?.[0] ?? null)}
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                      />
+                      <div className="px-sm py-md rounded-lg border-2 border-dashed border-neutral-300 bg-neutral-50 text-center hover:border-primary-400 hover:bg-primary-50 transition-colors">
+                        <Upload size={20} className="mx-auto text-neutral-400 mb-xs" />
+                        <p className="text-sm font-medium text-neutral-700">
+                          Cliquez pour sélectionner un fichier
+                        </p>
+                        <p className="text-xs text-neutral-500 mt-xs">
+                          PDF, JPG, PNG, HEIC — 10 Mo max
+                        </p>
+                      </div>
+                    </div>
+                    {pieceJointe && (
+                      <p className="mt-sm text-sm text-success-700 font-medium flex items-center gap-xs">
+                        ✓ Fichier sélectionné: {pieceJointe.name}
+                      </p>
+                    )}
+                  </motion.div>
+                )}
+
+                {/* Form Error */}
+                {formError && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-sm bg-danger-50 border border-danger-200 rounded-lg flex items-start gap-sm"
+                  >
+                    <AlertCircle size={20} className="text-danger-600 flex-shrink-0 mt-xs" />
+                    <p className="text-sm text-danger-900">{formError}</p>
+                  </motion.div>
+                )}
+
+                {/* AI Score Card */}
+                {dateDebut && dateFin && (
+                  <motion.div variants={itemVariants}>
+                    <AIScoreCard
+                      demandeData={{
+                        titre,
+                        dateDebut,
+                        dateFin,
+                        startHalfDay,
+                        endHalfDay,
+                        commentaire,
+                        typeConge: titre.toLowerCase().includes("maladie")
+                          ? "CONGE_MALADIE"
+                          : titre.toLowerCase().includes("sans solde")
+                            ? "CONGE_SANS_SOLDE"
+                            : "CONGES_PAYES",
+                      }}
+                      userId={user?.id}
+                      isLoading={loading}
+                    />
+                  </motion.div>
+                )}
+
+                {/* Form Actions */}
+                <motion.div variants={itemVariants} className="flex gap-sm justify-end pt-md border-t border-neutral-200">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => navigate("/employee/dashboard")}
+                  >
+                    Annuler
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    isLoading={submitting}
+                    disabled={submitting}
+                  >
+                    Soumettre la demande
+                  </Button>
+                </motion.div>
+              </form>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </ContentWrapper>
+    </PageContainer>
   );
 }

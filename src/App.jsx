@@ -1,6 +1,7 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/authcontext";
+import { ToastProvider } from "./components/ui";
 import Login from "./pages/login";
 import Home from "./pages/home";
 import Navbar from "./components/navbar";
@@ -24,9 +25,8 @@ import SoldesRh from "./pages/rh/SoldesRh";
 function App() {
   return (
     <AuthProvider>
-      <div className="min-h-screen bg-[#F9FAFB]">
-        <AppRoutes />
-      </div>
+      <ToastProvider />
+      <AppRoutes />
     </AuthProvider>
   );
 }

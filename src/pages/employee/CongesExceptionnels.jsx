@@ -1,8 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Spinner from "../../components/commun/Spinner";
+import { motion } from "framer-motion";
+import { AlertCircle, ArrowLeft, CheckCircle2 } from "lucide-react";
 import useDemandes from "../../hooks/useDemandes";
 import api from "../../utils/api";
+import {
+  PageContainer,
+  ContentWrapper,
+  PageHeader,
+  Button,
+  Card,
+  CardContent,
+  Spinner,
+} from "../../components/ui";
 
 export default function CongesExceptionnels() {
   const navigate = useNavigate();
@@ -89,142 +99,227 @@ export default function CongesExceptionnels() {
     }
   };
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1, delayChildren: 0.2 },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 10 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-6xl mx-auto px-6 py-10">
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="text-4xl font-bold text-slate-900">Congés exceptionnels</h1>
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            Retour
-          </button>
-        </div>
+    <PageContainer>
+      <ContentWrapper>
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+          <PageHeader
+            title="Congés exceptionnels"
+            description="Demandez un congé exceptionnel selon votre pays"
+            action={
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={ArrowLeft}
+                onClick={() => navigate(-1)}
+              >
+                Retour
+              </Button>
+            }
+          />
+        </motion.div>
 
         {error && (
-          <div className="mt-4 rounded-xl border-l-4 border-red-500 bg-red-50 p-4 shadow-sm">
-            <div className="text-sm font-medium text-red-700">{error}</div>
-          </div>
-        )}
-        {success && (
-          <div className="mt-4 rounded-xl border-l-4 border-emerald-500 bg-emerald-50 p-4 shadow-sm">
-            <div className="text-sm font-medium text-emerald-800">{success}</div>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-lg p-sm bg-danger-50 border border-danger-200 rounded-lg flex items-start gap-sm"
+          >
+            <AlertCircle size={20} className="text-danger-600 flex-shrink-0 mt-xs" />
+            <p className="text-sm text-danger-900">{error}</p>
+          </motion.div>
         )}
 
-        <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-sky-700">Disponibles pour votre pays</h2>
-            {loading ? (
-              <div className="mt-6">
-                <Spinner />
-              </div>
-            ) : (
-              <div className="mt-4 space-y-3">
-                {items.map((it) => (
-                  <div
-                    key={it.id}
-                    className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
-                  >
-                    <div>
-                      <div className="font-semibold text-slate-900">{it.label}</div>
-                      <div className="text-xs text-slate-600">
-                        Quota annuel: {it.daysPerYear ?? 0} j — Restant: {it.remainingDays ?? "—"} j
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedId(String(it.id))}
-                      className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
-                    >
-                      Choisir
-                    </button>
+        {success && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-lg p-sm bg-success-50 border border-success-200 rounded-lg flex items-start gap-sm"
+          >
+            <CheckCircle2 size={20} className="text-success-600 flex-shrink-0 mt-xs" />
+            <p className="text-sm text-success-900">{success}</p>
+          </motion.div>
+        )}
+
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-1 lg:grid-cols-2 gap-lg"
+        >
+          {/* Available Leaves */}
+          <motion.div variants={itemVariants}>
+            <Card variant="default">
+              <CardContent className="pt-lg">
+                <h2 className="text-lg font-semibold text-neutral-900 mb-md">
+                  Disponibles pour votre pays
+                </h2>
+
+                {loading ? (
+                  <div className="mt-lg">
+                    <Spinner size="sm" />
+                    <p className="text-sm text-neutral-600 mt-sm">Chargement des congés exceptionnels...</p>
                   </div>
-                ))}
-                {items.length === 0 && (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                ) : items.length > 0 ? (
+                  <div className="space-y-sm">
+                    {items.map((it) => {
+                      const isSelected = String(it.id) === String(selectedId);
+                      return (
+                        <motion.div
+                          key={it.id}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="flex items-center justify-between rounded-lg border border-neutral-200 bg-neutral-50 px-sm py-xs hover:bg-neutral-100 transition-colors"
+                        >
+                          <div className="flex-1">
+                            <p className="font-semibold text-neutral-900">{it.label}</p>
+                            <p className="text-xs text-neutral-500 mt-xs">
+                              Quota annuel: {it.daysPerYear ?? 0} j — Restant: {it.remainingDays ?? "—"} j
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant={isSelected ? "primary" : "secondary"}
+                            onClick={() => setSelectedId(String(it.id))}
+                          >
+                            {isSelected ? "Sélectionné" : "Choisir"}
+                          </Button>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-sm text-sm text-neutral-600 text-center">
                     Aucun congé exceptionnel n'est configuré pour votre pays.
                   </div>
                 )}
-              </div>
-            )}
-          </div>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-sky-700">Nouvelle demande</h2>
+          {/* New Request Form */}
+          <motion.div variants={itemVariants}>
+            <Card variant="default">
+              <CardContent className="pt-lg">
+                <h2 className="text-lg font-semibold text-neutral-900 mb-md">
+                  Nouvelle demande
+                </h2>
 
-            <div className="mt-4 grid grid-cols-1 gap-3">
-              <label className="text-sm font-semibold text-slate-700">
-                Type
-                <select
-                  value={selectedId}
-                  onChange={(e) => setSelectedId(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">— Sélectionner —</option>
-                  {items.map((it) => (
-                    <option key={it.id} value={String(it.id)}>
-                      {it.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <div className="space-y-md">
+                  {/* Type */}
+                  <div>
+                    <label htmlFor="exc-type" className="block text-sm font-semibold text-neutral-900 mb-xs">
+                      Type <span className="text-danger-600">*</span>
+                    </label>
+                    <select
+                      id="exc-type"
+                      value={selectedId}
+                      onChange={(e) => setSelectedId(e.target.value)}
+                      className="w-full px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                    >
+                      <option value="">— Sélectionner —</option>
+                      {items.map((it) => (
+                        <option key={it.id} value={String(it.id)}>
+                          {it.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className="text-sm font-semibold text-slate-700">
-                  Date début
-                  <input
-                    type="date"
-                    value={dateDebut}
-                    onChange={(e) => setDateDebut(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </label>
-                <label className="text-sm font-semibold text-slate-700">
-                  Date fin
-                  <input
-                    type="date"
-                    value={dateFin}
-                    onChange={(e) => setDateFin(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </label>
-              </div>
+                  {/* Dates */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-sm">
+                    <div>
+                      <label htmlFor="exc-start" className="block text-sm font-semibold text-neutral-900 mb-xs">
+                        Date début <span className="text-danger-600">*</span>
+                      </label>
+                      <input
+                        id="exc-start"
+                        type="date"
+                        value={dateDebut}
+                        onChange={(e) => setDateDebut(e.target.value)}
+                        className="w-full px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="exc-end" className="block text-sm font-semibold text-neutral-900 mb-xs">
+                        Date fin <span className="text-danger-600">*</span>
+                      </label>
+                      <input
+                        id="exc-end"
+                        type="date"
+                        value={dateFin}
+                        onChange={(e) => setDateFin(e.target.value)}
+                        className="w-full px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                      />
+                    </div>
+                  </div>
 
-              <label className="text-sm font-semibold text-slate-700">
-                Motif (optionnel)
-                <textarea
-                  value={motif}
-                  onChange={(e) => setMotif(e.target.value)}
-                  rows={3}
-                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </label>
+                  {/* Reason */}
+                  <div>
+                    <label htmlFor="exc-reason" className="block text-sm font-semibold text-neutral-900 mb-xs">
+                      Motif <span className="text-neutral-500 font-normal text-xs">(optionnel)</span>
+                    </label>
+                    <textarea
+                      id="exc-reason"
+                      value={motif}
+                      onChange={(e) => setMotif(e.target.value)}
+                      className="w-full px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm min-h-24 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-none"
+                      placeholder="Expliquez les raisons de votre demande..."
+                    />
+                  </div>
 
-              <label className="text-sm font-semibold text-slate-700">
-                Justificatif (optionnel)
-                <input
-                  type="file"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                  className="mt-1 block w-full text-sm text-slate-700"
-                />
-              </label>
+                  {/* File Upload */}
+                  <div>
+                    <label htmlFor="exc-file" className="block text-sm font-semibold text-neutral-900 mb-xs">
+                      Justificatif <span className="text-neutral-500 font-normal text-xs">(optionnel)</span>
+                    </label>
+                    <input
+                      id="exc-file"
+                      type="file"
+                      onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                      className="w-full px-sm py-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all file:mr-sm file:py-xs file:px-sm file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-neutral-100 file:text-neutral-700 hover:file:bg-neutral-200"
+                    />
+                  </div>
 
-              <button
-                type="button"
-                onClick={submit}
-                disabled={saving || !selected}
-                className="mt-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
-              >
-                {saving ? "Envoi..." : "Soumettre la demande"}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+                  {/* Submit */}
+                  <div className="flex gap-sm justify-end pt-md border-t border-neutral-200">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => navigate(-1)}
+                    >
+                      Annuler
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="success"
+                      onClick={submit}
+                      disabled={saving || !selected}
+                      isLoading={saving}
+                    >
+                      Soumettre
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
+      </ContentWrapper>
+    </PageContainer>
   );
 }
 
