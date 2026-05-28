@@ -254,9 +254,7 @@ export default function HistoriqueDemandes() {
                                 {typeof jours === "number" ? jours : "--"}
                               </td>
                               <td className="px-sm py-xs text-xs">
-                                <span className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-gray-100 text-gray-800">
-                                  —
-                                </span>
+                                <StatusBadge status={etat} icon={true} />
                               </td>
                               <td className="px-sm py-xs text-sm text-neutral-700">
                                 {(() => {

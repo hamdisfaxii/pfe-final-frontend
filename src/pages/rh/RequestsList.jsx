@@ -312,7 +312,7 @@ export default function RequestsList() {
                           })()}
                         </td>
                         <td className="px-sm py-xs">
-                          <StatusBadge statut={r.statut} />
+                          <StatusBadge status={r.statut} icon={true} />
                         </td>
                         <td className="px-sm py-xs">
                           <Link to={`/rh/requests/${r.id}`}>
