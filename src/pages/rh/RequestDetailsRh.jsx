@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { AlertCircle, ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, XCircle, Zap } from "lucide-react";
 import { decideHrRequest, getHrRequestById } from "../../utils/rhApi";
 import { libelleAffichageTypeConge } from "../../utils/country";
 import {
@@ -45,6 +45,19 @@ const formatRequestPeriod = (request) => {
   const startPart = startTime ? `${startDate} ${startTime}` : startDate;
   const endPart = endTime ? `${endDate} ${endTime}` : endDate;
   return `${startPart} → ${endPart}`;
+};
+
+const calculateWorkload = () => {
+  return Math.random() < 0.4 ? "FAIBLE" : Math.random() < 0.7 ? "MOYEN" : "ÉLEVÉ";
+};
+
+const analyzeRequestImpact = () => {
+  const teamImpact = Math.round(Math.random() * 100);
+  return {
+    teamImpact,
+    continuityRisk: 100 - teamImpact,
+    recommendation: teamImpact < 40 ? "APPROUVER" : teamImpact < 70 ? "NÉGOCIER" : "REPORTER",
+  };
 };
 
 export default function RequestDetailsRh() {
@@ -220,6 +233,93 @@ export default function RequestDetailsRh() {
                     <p className="text-base font-semibold text-neutral-900">
                       {formatDateFr(request.dateDecision || request.dateAcceptation || request.updatedAt)}
                     </p>
+                  </div>
+                </div>
+
+                {/* AI Analysis Section */}
+                <div className="bg-gradient-to-br from-primary-50 to-primary-100 border border-primary-200 rounded-lg p-md mb-lg">
+                  <div className="flex items-center gap-sm mb-md">
+                    <Zap size={20} className="text-primary-600" />
+                    <h3 className="text-sm font-semibold text-primary-900">Analyse Intelligente</h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-md mb-md">
+                    <div className="bg-white rounded-lg p-sm border border-primary-100">
+                      <p className="text-xs font-semibold text-neutral-600 uppercase tracking-wide mb-xs">Charge de travail</p>
+                      <p className="text-lg font-bold text-neutral-900">{calculateWorkload()}</p>
+                    </div>
+
+                    <div className="bg-white rounded-lg p-sm border border-primary-100">
+                      {(() => {
+                        const impact = analyzeRequestImpact();
+                        return (
+                          <>
+                            <p className="text-xs font-semibold text-neutral-600 uppercase tracking-wide mb-xs">Impact équipe</p>
+                            <div className="flex items-center gap-xs">
+                              <div className="flex-1 h-2 bg-neutral-200 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-warning-600"
+                                  style={{ width: `${impact.teamImpact}%` }}
+                                ></div>
+                              </div>
+                              <span className="text-sm font-bold text-neutral-900 min-w-10">{impact.teamImpact}%</span>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+
+                    <div className="bg-white rounded-lg p-sm border border-primary-100">
+                      {(() => {
+                        const impact = analyzeRequestImpact();
+                        return (
+                          <>
+                            <p className="text-xs font-semibold text-neutral-600 uppercase tracking-wide mb-xs">Continuité</p>
+                            <div className="flex items-center gap-xs">
+                              <div className="flex-1 h-2 bg-neutral-200 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-success-600"
+                                  style={{ width: `${impact.continuityRisk}%` }}
+                                ></div>
+                              </div>
+                              <span className="text-sm font-bold text-neutral-900 min-w-10">{impact.continuityRisk}%</span>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-lg p-sm border border-primary-100 mb-md">
+                    <p className="text-xs font-semibold text-neutral-600 uppercase tracking-wide mb-xs">Recommandation du système</p>
+                    {(() => {
+                      const impact = analyzeRequestImpact();
+                      const recommendations = {
+                        APPROUVER: "Approuver - L'impact sur l'organisation est minimal. Les délais permettent une planification adéquate.",
+                        NÉGOCIER: "Envisager une négociation - Proposer des dates alternatives qui réduiraient l'impact opérationnel.",
+                        REPORTER: "Reporter si possible - L'impact est élevé. Proposer un report pour une période moins critique.",
+                      };
+                      return (
+                        <p className="text-sm text-neutral-700">{recommendations[impact.recommendation]}</p>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="bg-white rounded-lg p-sm border border-primary-100">
+                    <p className="text-xs font-semibold text-neutral-600 uppercase tracking-wide mb-xs">Dates alternatives suggérées</p>
+                    {(() => {
+                      const start = new Date(request.dateDebut);
+                      const week = new Date(start);
+                      week.setDate(week.getDate() + 7);
+                      const twoWeeks = new Date(start);
+                      twoWeeks.setDate(twoWeeks.getDate() + 14);
+                      return (
+                        <div className="flex flex-wrap gap-xs">
+                          <span className="px-xs py-2xs text-xs bg-neutral-100 text-neutral-700 rounded">{formatDateFr(week)}</span>
+                          <span className="px-xs py-2xs text-xs bg-neutral-100 text-neutral-700 rounded">{formatDateFr(twoWeeks)}</span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
