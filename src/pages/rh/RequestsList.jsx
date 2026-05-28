@@ -234,12 +234,13 @@ export default function RequestsList() {
             <Spinner size="lg" />
           </div>
         ) : (
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            className="rounded-2xl border border-neutral-200 bg-white overflow-hidden shadow-xs"
-          >
+          <>
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="rounded-2xl border border-neutral-200 bg-white overflow-hidden shadow-xs"
+            >
             <div className="overflow-x-auto">
               <table className="min-w-full">
                 <thead className="bg-neutral-50 border-b border-neutral-200">
@@ -340,38 +341,39 @@ export default function RequestsList() {
                 </tbody>
               </table>
             </div>
-          </motion.div>
-
-          {totalPages > 1 && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3 }}
-              className="flex items-center justify-between gap-md mt-lg"
-            >
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={ChevronLeft}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={pageSafe === 1}
-              >
-                Précédent
-              </Button>
-              <div className="text-sm font-medium text-neutral-600">
-                Page {pageSafe} / {totalPages}
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={ChevronRight}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={pageSafe === totalPages}
-              >
-                Suivant
-              </Button>
             </motion.div>
-          )}
+
+            {totalPages > 1 && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="flex items-center justify-between gap-md mt-lg"
+              >
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={ChevronLeft}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={pageSafe === 1}
+                >
+                  Précédent
+                </Button>
+                <div className="text-sm font-medium text-neutral-600">
+                  Page {pageSafe} / {totalPages}
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={ChevronRight}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={pageSafe === totalPages}
+                >
+                  Suivant
+                </Button>
+              </motion.div>
+            )}
+          </>
         )}
       </ContentWrapper>
     </PageContainer>
