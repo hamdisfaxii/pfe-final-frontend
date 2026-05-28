@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { AlertCircle, ArrowLeft, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, Trash2, Clock, CheckCircle, Info } from "lucide-react";
 import useDemandes from "../../hooks/useDemandes";
 import { formaterDate } from "../../utils/calculJours";
 import { libelleAffichageTypeConge } from "../../utils/country";
@@ -36,6 +36,44 @@ const isAttente = (statut) => {
 };
 
 const pickId = (demande) => demande?.id ?? demande?._id ?? demande?.ID;
+
+const getStatusInfo = (status) => {
+  const s = String(status ?? "").trim().toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+  if (s.includes("attente") || s.includes("pending")) {
+    return {
+      message: "Votre demande est en cours de traitement",
+      detail: "Elle sera examinée par les responsables RH",
+      delayDays: 3,
+      icon: Clock,
+      color: "warning",
+    };
+  }
+  if (s.includes("accepte") || s.includes("approuve") || s.includes("approved")) {
+    return {
+      message: "Votre demande a été approuvée",
+      detail: "Vos congés sont confirmés",
+      delayDays: 0,
+      icon: CheckCircle,
+      color: "success",
+    };
+  }
+  if (s.includes("refuse") || s.includes("rejet") || s.includes("rejected")) {
+    return {
+      message: "Votre demande a été refusée",
+      detail: "Consultez les raisons du refus",
+      delayDays: 0,
+      icon: AlertCircle,
+      color: "danger",
+    };
+  }
+  return {
+    message: "Statut inconnu",
+    detail: "Contactez les RH pour plus d'infos",
+    delayDays: null,
+    icon: Info,
+    color: "neutral",
+  };
+};
 
 export default function DetailDemande() {
   const navigate = useNavigate();
@@ -122,6 +160,48 @@ export default function DetailDemande() {
                       </div>
                       <StatusBadge statut={statut} />
                     </div>
+
+                    {/* Status Information Section */}
+                    {(() => {
+                      const info = getStatusInfo(statut);
+                      const bgColorMap = {
+                        warning: "bg-warning-50 border-warning-200",
+                        success: "bg-success-50 border-success-200",
+                        danger: "bg-danger-50 border-danger-200",
+                        neutral: "bg-neutral-50 border-neutral-200",
+                      };
+                      const textColorMap = {
+                        warning: "text-warning-900",
+                        success: "text-success-900",
+                        danger: "text-danger-900",
+                        neutral: "text-neutral-900",
+                      };
+                      const IconComponent = info.icon;
+                      const colorClass = bgColorMap[info.color] || bgColorMap.neutral;
+                      const textClass = textColorMap[info.color] || textColorMap.neutral;
+
+                      return (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.1 }}
+                          className={`${colorClass} border rounded-lg p-md mb-lg`}
+                        >
+                          <div className="flex items-start gap-sm">
+                            <IconComponent size={20} className={`flex-shrink-0 mt-xs ${textClass}`} />
+                            <div className="flex-1">
+                              <p className={`font-semibold ${textClass}`}>{info.message}</p>
+                              <p className={`text-sm mt-xs ${textClass} opacity-90`}>{info.detail}</p>
+                              {info.delayDays && info.delayDays > 0 && (
+                                <p className={`text-xs mt-xs font-medium ${textClass} opacity-75`}>
+                                  Délai estimé : {info.delayDays} à {info.delayDays + 2} jours ouvrables
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      );
+                    })()}
 
                     {/* Details Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-lg mb-lg">
