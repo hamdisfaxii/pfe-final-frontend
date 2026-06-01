@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "PowerShell(Get-Process java -ErrorAction SilentlyContinue)"
+      "PowerShell(Get-Process java -ErrorAction SilentlyContinue)",
+      "Bash(cp /c/Users/Asus/Desktop/chapitre_7_sprint_5.md /c/Users/Asus/Desktop/Chapitre_7_Sprint_5_CONTENU.txt)",
+      "Read(//c/Users/Asus/Desktop/**)"
     ]
   }
 }
