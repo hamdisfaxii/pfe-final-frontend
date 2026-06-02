@@ -28,11 +28,12 @@ npm run dev
 
 ## 📚 Documentation
 
-### 👉 POINT D'ENTRÉE PRINCIPAL
+### 👉 TOUT DANS UN SEUL FICHIER
 
-**[📚 TOUS LES GUIDES DANS UN SEUL ENDROIT](./docs/INDEX.md)** ⭐
+**[📖 DOCUMENTATION_COMPLETE.md](./DOCUMENTATION_COMPLETE.md)** ⭐
 
-Ouvrez ce lien pour trouver exactement le guide dont vous avez besoin.
+TOUTE la documentation (installation, guides, dépannage, architecture) dans un seul fichier.
+Lisez ce fichier du début à la fin - c'est tout ce qu'il faut!
 
 ---
 
