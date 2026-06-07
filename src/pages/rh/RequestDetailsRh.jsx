@@ -47,18 +47,9 @@ const formatRequestPeriod = (request) => {
   return `${startPart} → ${endPart}`;
 };
 
-const calculateWorkload = () => {
-  return Math.random() < 0.4 ? "FAIBLE" : Math.random() < 0.7 ? "MOYEN" : "ÉLEVÉ";
-};
-
-const analyzeRequestImpact = () => {
-  const teamImpact = Math.round(Math.random() * 100);
-  return {
-    teamImpact,
-    continuityRisk: 100 - teamImpact,
-    recommendation: teamImpact < 40 ? "APPROUVER" : teamImpact < 70 ? "NÉGOCIER" : "REPORTER",
-  };
-};
+// 🔒 CORRIGÉ : Suppression des calculs aléatoires
+// L'analyse IA est maintenant fournie par le backend avec données réelles
+// Les fonctions aléatoires causaient des décisions RH non déterministes
 
 export default function RequestDetailsRh() {
   const { id } = useParams();
@@ -68,12 +59,17 @@ export default function RequestDetailsRh() {
   const [commentError, setCommentError] = useState("");
   const [request, setRequest] = useState(null);
   const [comment, setComment] = useState("");
+  const [impact, setImpact] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      setRequest(await getHrRequestById(id));
+      const req = await getHrRequestById(id);
+      setRequest(req);
+      // Charger l'analyse d'impact depuis le backend
+      const impactData = await fetch(`/api/ai/impact-score?demandeId=${req.id}`).then(r => r.json());
+      setImpact(impactData);
     } catch {
       setError("Impossible de charger le détail de la demande.");
     } finally {
@@ -246,61 +242,46 @@ export default function RequestDetailsRh() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-md mb-md">
                     <div className="bg-white rounded-lg p-sm border border-primary-100">
                       <p className="text-xs font-semibold text-neutral-600 uppercase tracking-wide mb-xs">Charge de travail</p>
-                      <p className="text-lg font-bold text-neutral-900">{calculateWorkload()}</p>
+                      <p className="text-lg font-bold text-neutral-900">{impact?.workload ?? "—"}</p>
                     </div>
 
                     <div className="bg-white rounded-lg p-sm border border-primary-100">
-                      {(() => {
-                        const impact = analyzeRequestImpact();
-                        return (
-                          <>
-                            <p className="text-xs font-semibold text-neutral-600 uppercase tracking-wide mb-xs">Impact équipe</p>
-                            <div className="flex items-center gap-xs">
-                              <div className="flex-1 h-2 bg-neutral-200 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-warning-600"
-                                  style={{ width: `${impact.teamImpact}%` }}
-                                ></div>
-                              </div>
-                              <span className="text-sm font-bold text-neutral-900 min-w-10">{impact.teamImpact}%</span>
-                            </div>
-                          </>
-                        );
-                      })()}
+                      <p className="text-xs font-semibold text-neutral-600 uppercase tracking-wide mb-xs">Impact équipe</p>
+                      <div className="flex items-center gap-xs">
+                        <div className="flex-1 h-2 bg-neutral-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-warning-600"
+                            style={{ width: `${impact?.teamImpact ?? 0}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm font-bold text-neutral-900 min-w-10">{impact?.teamImpact ?? "—"}%</span>
+                      </div>
                     </div>
 
                     <div className="bg-white rounded-lg p-sm border border-primary-100">
-                      {(() => {
-                        const impact = analyzeRequestImpact();
-                        return (
-                          <>
-                            <p className="text-xs font-semibold text-neutral-600 uppercase tracking-wide mb-xs">Continuité</p>
-                            <div className="flex items-center gap-xs">
-                              <div className="flex-1 h-2 bg-neutral-200 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-success-600"
-                                  style={{ width: `${impact.continuityRisk}%` }}
-                                ></div>
-                              </div>
-                              <span className="text-sm font-bold text-neutral-900 min-w-10">{impact.continuityRisk}%</span>
-                            </div>
-                          </>
-                        );
-                      })()}
+                      <p className="text-xs font-semibold text-neutral-600 uppercase tracking-wide mb-xs">Continuité</p>
+                      <div className="flex items-center gap-xs">
+                        <div className="flex-1 h-2 bg-neutral-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-success-600"
+                            style={{ width: `${impact?.continuityRisk ?? 0}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm font-bold text-neutral-900 min-w-10">{impact?.continuityRisk ?? "—"}%</span>
+                      </div>
                     </div>
                   </div>
 
                   <div className="bg-white rounded-lg p-sm border border-primary-100 mb-md">
                     <p className="text-xs font-semibold text-neutral-600 uppercase tracking-wide mb-xs">Recommandation du système</p>
                     {(() => {
-                      const impact = analyzeRequestImpact();
                       const recommendations = {
                         APPROUVER: "Approuver - L'impact sur l'organisation est minimal. Les délais permettent une planification adéquate.",
                         NÉGOCIER: "Envisager une négociation - Proposer des dates alternatives qui réduiraient l'impact opérationnel.",
                         REPORTER: "Reporter si possible - L'impact est élevé. Proposer un report pour une période moins critique.",
                       };
                       return (
-                        <p className="text-sm text-neutral-700">{recommendations[impact.recommendation]}</p>
+                        <p className="text-sm text-neutral-700">{recommendations[impact?.recommendation] ?? "Analyse en cours..."}</p>
                       );
                     })()}
                   </div>

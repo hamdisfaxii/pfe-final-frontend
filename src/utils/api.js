@@ -8,16 +8,22 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" }, // j'envoie du JSON
 });
 
-// Intercepteur : ajoute le token sauf sur la connexion (évite d’envoyer un JWT expiré avec le POST login — certains pare-feu / stacks réagissent mal).
+// 🔒 Intercepteur : ajoute JWT et CSRF token
 api.interceptors.request.use((config) => {
   const path = String(config.url ?? "");
   const isLoginPost =
     path.includes("auth/login") &&
     String(config.method ?? "get").toLowerCase() === "post";
+
   if (!isLoginPost) {
     const token = localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    // Ajouter CSRF token pour les requêtes authentifiées
+    const csrfToken = localStorage.getItem("csrfToken");
+    if (csrfToken) {
+      config.headers["X-CSRF-TOKEN"] = csrfToken;
     }
   } else if (config.headers?.Authorization) {
     delete config.headers.Authorization;
